@@ -1,0 +1,35 @@
+---
+import Base from '../layouts/Base.astro';
+
+const title = 'Page not found — Hours Apart';
+const description = 'That page does not exist. Head back to the world clock.';
+---
+
+<Base title={title} description={description}>
+  <meta name="robots" content="noindex" slot="head" />
+
+  <section class="mx-auto max-w-lg py-16 text-center sm:py-24">
+    <p class="text-sm font-medium uppercase tracking-widest text-paper-500">404</p>
+    <h1 class="mt-3 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+      This page slipped a time zone
+    </h1>
+    <p class="mt-4 text-paper-700">
+      The address you followed does not lead anywhere here. It may have moved, or the link may have
+      been mangled in transit.
+    </p>
+    <div class="mt-8 flex flex-wrap justify-center gap-3">
+      <a
+        href="/"
+        class="ring-focus rounded-lg bg-paper-900 px-4 py-2 text-sm font-medium text-paper-50 hover:opacity-90"
+      >
+        World clock
+      </a>
+      <a
+        href="/overlap"
+        class="ring-focus rounded-lg border border-paper-300 px-4 py-2 text-sm font-medium text-paper-900 hover:text-paper-700"
+      >
+        Meeting planner
+      </a>
+    </div>
+  </section>
+</Base>

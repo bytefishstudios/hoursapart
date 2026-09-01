@@ -1,0 +1,211 @@
+---
+import '../styles/global.css';
+
+interface Props {
+  title: string;
+  description: string;
+  path?: string;
+  image?: string;
+}
+
+const { title, description, path, image } = Astro.props;
+const origin = Astro.site ?? Astro.url.origin;
+const canonical = new URL(path ?? Astro.url.pathname, origin);
+const ogImage = new URL(image ?? '/og.png', origin);
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical.href} />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content={canonical.href} />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:image" content={ogImage.href} />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta
+      property="og:image:alt"
+      content="Hours Apart — a world clock that shows whether it is light there"
+    />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content={ogImage.href} />
+
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <link rel="manifest" href="/site.webmanifest" />
+    <meta name="theme-color" content="#fdfcf8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#12141f" media="(prefers-color-scheme: dark)" />
+
+    <script
+      type="application/ld+json"
+      set:html={JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'WebApplication',
+        name: title,
+        applicationCategory: 'BusinessApplication',
+        operatingSystem: 'Any',
+        description,
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+      })}
+    />
+    {
+      /*
+      Runs before first paint so the page never flashes the wrong palette. It
+      only makes the coarse light/dark call, since the precise sky state needs
+      the solar module and a deferred script is too late to matter visually.
+    */
+    }
+    <script is:inline>
+      (() => {
+        try {
+          const stored = localStorage.getItem('sky-mode');
+          if (stored === 'light') return void (document.documentElement.dataset.sky = 'day');
+          if (stored === 'dark') return void (document.documentElement.dataset.sky = 'night');
+          const dark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+          document.documentElement.dataset.sky = dark ? 'night' : 'day';
+        } catch {
+          document.documentElement.dataset.sky = 'day';
+        }
+      })();
+    </script>
+
+    <slot name="head" />
+  </head>
+
+  <body class="bg-paper-50 text-paper-900 font-sans antialiased">
+    <a
+      href="#main"
+      class="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:rounded focus:bg-paper-900 focus:px-3 focus:py-2 focus:text-paper-50"
+    >
+      Skip to content
+    </a>
+
+    <header class="mx-auto max-w-4xl px-4 pt-6 sm:pt-8">
+      <a
+        href="/"
+        class="ring-focus inline-block rounded text-base font-semibold tracking-tight text-paper-900 hover:text-paper-700"
+      >
+        Hours Apart
+      </a>
+    </header>
+
+    <main id="main" class="mx-auto max-w-4xl px-4 py-8 sm:py-12">
+      <slot />
+    </main>
+
+    <footer class="mx-auto mt-20 max-w-4xl px-4 pb-10 text-xs leading-relaxed text-paper-500">
+      <p class="max-w-2xl">
+        Time zone data comes from your own device's IANA database, so it is as current as your
+        browser. Nothing you enter is uploaded &mdash; the whole scenario lives in the link.
+      </p>
+
+      <div class="mt-5 flex flex-wrap items-center gap-1.5">
+        <span id="sky-label" class="mr-1">Theme</span>
+        <div role="group" aria-labelledby="sky-label" class="flex gap-1">
+          <button
+            type="button"
+            data-sky-mode="auto"
+            class="ring-focus rounded-md border border-paper-200 px-2 py-1 hover:text-paper-900"
+          >
+            Follow my sky
+          </button>
+          <button
+            type="button"
+            data-sky-mode="light"
+            class="ring-focus rounded-md border border-paper-200 px-2 py-1 hover:text-paper-900"
+          >
+            Light
+          </button>
+          <button
+            type="button"
+            data-sky-mode="dark"
+            class="ring-focus rounded-md border border-paper-200 px-2 py-1 hover:text-paper-900"
+          >
+            Dark
+          </button>
+        </div>
+        <span id="sky-state" class="ml-1 opacity-70"></span>
+      </div>
+
+      <nav aria-label="Footer" class="mt-5 flex flex-wrap gap-x-4 gap-y-1">
+        <a href="/" class="ring-focus rounded hover:text-paper-900">World clock</a>
+        <a href="/overlap" class="ring-focus rounded hover:text-paper-900">Meeting planner</a>
+        <a href="/privacy" class="ring-focus rounded hover:text-paper-900">Privacy</a>
+      </nav>
+    </footer>
+
+    <script>
+      import { skyState } from '../lib/time/solar';
+      import { latitudeFor } from '../lib/time/cities';
+      import { localTimeZone } from '../lib/time/zone';
+
+      /**
+       * Refine the coarse light/dark guess made in the head into the real sky
+       * state where the reader is, and keep it current as the evening comes in.
+       *
+       * A stored preference always wins. Automatically dragging someone into a
+       * dark interface with no way out would be worse than not doing it at all.
+       */
+      type Mode = 'auto' | 'light' | 'dark';
+
+      const readMode = (): Mode => {
+        try {
+          const stored = localStorage.getItem('sky-mode');
+          return stored === 'light' || stored === 'dark' ? stored : 'auto';
+        } catch {
+          return 'auto';
+        }
+      };
+
+      function apply(mode: Mode) {
+        const root = document.documentElement;
+        const label = document.getElementById('sky-state');
+
+        if (mode === 'light' || mode === 'dark') {
+          root.dataset.sky = mode === 'light' ? 'day' : 'night';
+          if (label) label.textContent = '';
+        } else {
+          const timeZone = localTimeZone();
+          const { state, approximate } = skyState(new Date(), timeZone, latitudeFor(timeZone));
+          root.dataset.sky = state;
+          if (label) {
+            label.textContent = approximate
+              ? `${state} where you are, estimated`
+              : `${state} where you are`;
+          }
+        }
+
+        for (const button of document.querySelectorAll<HTMLButtonElement>('[data-sky-mode]')) {
+          const active = button.dataset.skyMode === mode;
+          button.setAttribute('aria-pressed', String(active));
+          button.classList.toggle('bg-paper-900', active);
+          button.classList.toggle('text-paper-50', active);
+        }
+      }
+
+      for (const button of document.querySelectorAll<HTMLButtonElement>('[data-sky-mode]')) {
+        button.addEventListener('click', () => {
+          const mode = (button.dataset.skyMode ?? 'auto') as Mode;
+          try {
+            if (mode === 'auto') localStorage.removeItem('sky-mode');
+            else localStorage.setItem('sky-mode', mode);
+          } catch {
+            // Private browsing: the choice just will not persist.
+          }
+          apply(mode);
+        });
+      }
+
+      apply(readMode());
+      // Twilight is short; re-checking each minute catches the handover.
+      window.setInterval(() => apply(readMode()), 60_000);
+    </script>
+  </body>
+</html>

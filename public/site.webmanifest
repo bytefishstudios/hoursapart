@@ -1,0 +1,13 @@
+{
+  "name": "Hours Apart",
+  "short_name": "Hours Apart",
+  "description": "A world clock that shows whether it is light there, and warns you before daylight saving shifts a recurring meeting.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fdfcf8",
+  "theme_color": "#fdfcf8",
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png" }
+  ]
+}

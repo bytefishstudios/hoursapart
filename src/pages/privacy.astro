@@ -1,0 +1,69 @@
+---
+import Base from '../layouts/Base.astro';
+
+const title = 'Privacy — Hours Apart';
+const description =
+  'Hours Apart has no accounts, no database and no tracking cookies. Here is exactly what it does and does not keep.';
+---
+
+<Base title={title} description={description} path="/privacy">
+  <article class="max-w-2xl">
+    <header class="mb-7">
+      <h1 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Privacy</h1>
+      <p class="mt-3 text-paper-700">
+        The short version: there is nothing to collect, because the site was built without a place
+        to put it. No account, no database, no login.
+      </p>
+    </header>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">What stays on your device</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        Your list of cities is not stored on a server. It is encoded into the address bar, which is
+        why you can bookmark it, reload it, or paste the link to someone else and have them see the
+        same thing. The link never leaves your browser unless you choose to share it.
+      </p>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        The only thing kept locally is your theme choice &mdash; whether you asked the page to
+        follow your sky, or pinned it to light or dark. That lives in your browser's <span
+          class="nums">localStorage</span
+        > and goes no further. Clearing your site data removes it.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">Where the time data comes from</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        Offsets, daylight saving rules and your local zone are read from your own device through the
+        browser's built-in internationalisation API. Nothing about your location is sent anywhere to
+        work out the time.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">Cookies and tracking</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        The site sets no cookies and runs no advertising or cross-site tracking. Like any website it
+        is served by a host (Cloudflare) that keeps standard, aggregate request logs for security
+        and reliability; those are not tied to an identity here.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">Changes</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        If this ever changes &mdash; say a privacy-preserving, cookieless usage count is added
+        &mdash; it will be described here first.
+      </p>
+    </section>
+
+    <p class="mt-10">
+      <a
+        href="/"
+        class="ring-focus rounded text-sm font-medium text-paper-900 hover:text-paper-700"
+      >
+        &larr; Back to the world clock
+      </a>
+    </p>
+  </article>
+</Base>

@@ -1,0 +1,2 @@
+# Canonical host is the apex, hoursapart.app. Send www to it.
+https://www.hoursapart.app/* https://hoursapart.app/:splat 301!

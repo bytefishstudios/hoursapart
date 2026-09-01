@@ -1,0 +1,350 @@
+---
+import Base from '../../../layouts/Base.astro';
+import PairClock from '../../../components/PairClock.tsx';
+import { hubPairs, type City } from '../../../lib/time/cities';
+import {
+  convertTime,
+  describeDifference,
+  dstProfile,
+  formatGap,
+  formatGapShort,
+} from '../../../lib/time/difference';
+import { formatIsoDateLong, formatMinutes, formatOffset, toIsoDate } from '../../../lib/time/zone';
+
+export function getStaticPaths() {
+  return hubPairs().map(([x, y]) => {
+    // Alphabetical by slug so each pair has exactly one canonical URL rather
+    // than two competing for the same query.
+    const [a, b] = x.slug < y.slug ? [x, y] : [y, x];
+    return { params: { a: a.slug, b: b.slug }, props: { a, b } };
+  });
+}
+
+interface Props {
+  a: City;
+  b: City;
+}
+
+const { a, b } = Astro.props;
+
+const buildInstant = new Date();
+const buildDate = toIsoDate(buildInstant, a.timeZone);
+
+/*
+ * The scan starts at the first of the current month rather than at "today".
+ *
+ * A static page that says "today" is only true on the day it was built. Anchoring
+ * to the month means every row carries a real date on both ends, so the table
+ * stays correct between deploys instead of quietly sliding out of date.
+ */
+const fromDate = `${buildDate.slice(0, 7)}-01`;
+
+const diff = describeDifference(a.timeZone, b.timeZone, fromDate, 500);
+const profileA = dstProfile(a.timeZone, buildInstant, 14);
+const profileB = dstProfile(b.timeZone, buildInstant, 14);
+
+/** Spans that a reader could actually run into; the tail beyond a year is noise. */
+const spans = diff.spans;
+
+/** A conversion table at the hours people actually schedule. */
+const workingHours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
+const conversions = workingHours.map((h) => ({
+  hour: h,
+  ...convertTime(buildDate, a.timeZone, h * 60, b.timeZone),
+}));
+
+const gapWord = diff.varies
+  ? `${diff.distinctGaps.map((g) => formatGapShort(g)).join(', ')} depending on the date`
+  : formatGap(diff.gapAtStart);
+
+const title = diff.varies
+  ? `${a.name} to ${b.name} time difference — ${diff.distinctGaps.length} different gaps across the year`
+  : `${a.name} to ${b.name} time difference — ${formatGap(diff.gapAtStart)}`;
+
+const description = diff.varies
+  ? `${b.name} is ${gapWord} from ${a.name}. The difference is not fixed: it changes ${spans.length - 1} times a year because the two places move their clocks on different weekends. Exact dates and a converter for any date.`
+  : `${b.name} is ${formatGap(diff.gapAtStart)} than ${a.name}, and unlike most city pairs this gap stays the same all year. Convert any time on any date.`;
+
+const seedQuery = `p=${a.timeZone}-540-1020-12345_${b.timeZone}-540-1020-12345`;
+
+const faqs = [
+  {
+    q: `What is the time difference between ${a.name} and ${b.name}?`,
+    a: diff.varies
+      ? `There is no single answer, which is why most converters get this wrong for part of the year. ${b.name} is ${diff.distinctGaps.map((g) => formatGap(g)).join(', ')} than ${a.name} at different points in the year. Right now it is ${formatGap(diff.gapAtStart)}. The table on this page gives the exact dates for each.`
+      : `${b.name} is ${formatGap(diff.gapAtStart)} than ${a.name}, and this pair is unusual in that the gap does not change during the year.`,
+  },
+  {
+    q: `Why does the difference between ${a.name} and ${b.name} change?`,
+    a: (() => {
+      if (!diff.varies) {
+        return `It does not. ${
+          profileA.observesDst && profileB.observesDst
+            ? `Both cities observe daylight saving, but they change on the same dates and by the same amount, so the gap between them is preserved.`
+            : `Neither city shifts in a way that changes the gap.`
+        }`;
+      }
+      const parts: string[] = [];
+      parts.push(
+        profileA.observesDst
+          ? `${a.name} moves between UTC${formatOffset(profileA.standardOffset)} and UTC${formatOffset(profileA.dstOffset!)}`
+          : `${a.name} stays on UTC${formatOffset(profileA.standardOffset)} all year`,
+      );
+      parts.push(
+        profileB.observesDst
+          ? `${b.name} moves between UTC${formatOffset(profileB.standardOffset)} and UTC${formatOffset(profileB.dstOffset!)}`
+          : `${b.name} stays on UTC${formatOffset(profileB.standardOffset)} all year`,
+      );
+      const both = profileA.observesDst && profileB.observesDst;
+      return `${parts.join(', while ')}. ${
+        both
+          ? `Because the two do not change on the same weekend, and in opposite hemispheres they change in opposite directions, there are short windows each year where the gap is different from the rest of it.`
+          : `A gap only stays fixed when both ends are fixed. Here one end moves, so the difference moves with it even though nothing changed at the other end.`
+      }`;
+    })(),
+  },
+  ...(diff.shortestSpan && diff.varies
+    ? [
+        {
+          q: `When is the difference between ${a.name} and ${b.name} unusual?`,
+          a: `The shortest window runs from ${formatIsoDateLong(diff.shortestSpan.from)} to ${formatIsoDateLong(diff.shortestSpan.to)} — ${diff.shortestSpan.days} day${diff.shortestSpan.days === 1 ? '' : 's'} during which ${b.name} is ${formatGap(diff.shortestSpan.gapMinutes)} than ${a.name} rather than the usual amount. Short windows like this are where recurring meetings break, because nobody thinks to check.`,
+        },
+      ]
+    : []),
+  {
+    q: `Does this account for daylight saving automatically?`,
+    a: `Yes. Offsets come from your device's own copy of the IANA time zone database through the browser's Intl API, so they reflect whatever rules are current rather than a table bundled here that could go stale. Pick any date in the converter and it resolves that date's rules, not today's.`,
+  },
+];
+---
+
+<Base title={title} description={description} path={`/difference/${a.slug}/${b.slug}`}>
+  <script
+    type="application/ld+json"
+    slot="head"
+    set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: faqs.map((f) => ({
+        '@type': 'Question',
+        name: f.q,
+        acceptedAnswer: { '@type': 'Answer', text: f.a },
+      })),
+    })}
+  />
+
+  <nav aria-label="Breadcrumb" class="mb-5 text-xs text-paper-500">
+    <a href="/" class="ring-focus hover:text-paper-900">World clock</a>
+    <span aria-hidden="true" class="mx-1.5">/</span>
+    <a href={`/time/${a.slug}`} class="ring-focus hover:text-paper-900">{a.name}</a>
+    <span aria-hidden="true" class="mx-1.5">/</span>
+    <span aria-current="page">{b.name}</span>
+  </nav>
+
+  <header class="mb-6 max-w-2xl">
+    <h1 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+      {a.name} to {b.name}
+    </h1>
+    <p class="mt-3 text-paper-700">
+      {
+        diff.varies ? (
+          <>
+            These two are <strong class="font-semibold">not</strong> a fixed distance apart. The gap
+            is{' '}
+            <span class="nums">{diff.distinctGaps.map((g) => formatGapShort(g)).join(', ')}</span>{' '}
+            at different points in the year, and it changes {spans.length - 1} times.
+          </>
+        ) : (
+          <>
+            {b.name} is {formatGap(diff.gapAtStart)} than {a.name}, and this pair is unusual: the
+            gap holds steady all year.
+          </>
+        )
+      }
+    </p>
+  </header>
+
+  <PairClock
+    a={{ name: a.name, timeZone: a.timeZone, latitude: a.lat, slug: a.slug }}
+    b={{ name: b.name, timeZone: b.timeZone, latitude: b.lat, slug: b.slug }}
+    client:load
+  />
+
+  <!-- ---------------------------------------------------------- spans table -->
+  {
+    diff.varies && (
+      <section class="mt-12">
+        <h2 class="text-xl font-semibold tracking-tight">
+          Every gap between {a.name} and {b.name}, with dates
+        </h2>
+        <p class="mt-2 max-w-2xl text-sm leading-relaxed text-paper-700">
+          This is the table other converters do not show. Each row is a stretch of the year during
+          which the difference is a particular number. Dates are {a.name}'s local dates.
+        </p>
+
+        <div class="mt-4 overflow-x-auto rounded-xl border border-paper-200 bg-white">
+          <table class="w-full text-sm">
+            <caption class="sr-only">
+              Time difference between {a.name} and {b.name} by date range
+            </caption>
+            <thead>
+              <tr class="border-b border-paper-100 text-left text-xs text-paper-500">
+                <th scope="col" class="px-3 py-2 font-medium">
+                  From
+                </th>
+                <th scope="col" class="px-3 py-2 font-medium">
+                  Until
+                </th>
+                <th scope="col" class="px-3 py-2 font-medium">
+                  {b.name} is
+                </th>
+                <th scope="col" class="px-3 py-2 font-medium">
+                  Length
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {spans.map((span, i) => (
+                <tr
+                  class={`border-b border-paper-100 last:border-b-0 ${
+                    span === diff.shortestSpan ? 'bg-warn-100/40' : ''
+                  }`}
+                >
+                  <td class="nums px-3 py-2">{formatIsoDateLong(span.from)}</td>
+                  <td class="nums px-3 py-2">
+                    {i === spans.length - 1 ? 'onwards' : formatIsoDateLong(span.to)}
+                  </td>
+                  <td class="px-3 py-2">{formatGap(span.gapMinutes)}</td>
+                  <td class="nums px-3 py-2 text-paper-500">
+                    {i === spans.length - 1 ? '\u2014' : `${span.days} days`}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        {diff.shortestSpan && (
+          <p class="mt-3 max-w-2xl text-sm leading-relaxed text-warn-700">
+            The highlighted row is the one to watch. For {diff.shortestSpan.days} day
+            {diff.shortestSpan.days === 1 ? '' : 's'} from{' '}
+            {formatIsoDateLong(diff.shortestSpan.from)}, the difference is{' '}
+            {formatGap(diff.shortestSpan.gapMinutes)} rather than the usual figure. A weekly call
+            booked outside that window arrives an hour off inside it.
+          </p>
+        )}
+      </section>
+    )
+  }
+
+  <!-- ------------------------------------------------------ conversion table -->
+  <section class="mt-12">
+    <h2 class="text-xl font-semibold tracking-tight">
+      {a.name} hours converted to {b.name}
+    </h2>
+    <p class="mt-2 max-w-2xl text-sm leading-relaxed text-paper-700">
+      As at {formatIsoDateLong(buildDate)}. Use the converter above for any other day &mdash; and if
+      the table of gaps says the difference changes, these numbers change with it.
+    </p>
+
+    <div class="mt-4 overflow-x-auto rounded-xl border border-paper-200 bg-white">
+      <table class="w-full text-sm">
+        <caption class="sr-only">Hourly conversion from {a.name} to {b.name}</caption>
+        <thead>
+          <tr class="border-b border-paper-100 text-left text-xs text-paper-500">
+            <th scope="col" class="px-3 py-2 font-medium">{a.name}</th>
+            <th scope="col" class="px-3 py-2 font-medium">{b.name}</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            conversions.map((c) => (
+              <tr class="border-b border-paper-100 last:border-b-0">
+                <td class="nums px-3 py-2">{formatMinutes(c.hour * 60)}</td>
+                <td class="nums px-3 py-2">
+                  {formatMinutes(c.minutes)}
+                  {c.dayShift !== 0 && (
+                    <span class="ml-1.5 text-xs text-paper-500">
+                      {c.dayShift > 0 ? 'next day' : 'previous day'}
+                    </span>
+                  )}
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- --------------------------------------------------------------- clocks -->
+  <section class="mt-12 grid gap-3 sm:grid-cols-2">
+    {
+      [
+        { city: a, profile: profileA },
+        { city: b, profile: profileB },
+      ].map(({ city, profile }) => (
+        <div class="rounded-xl border border-paper-200 bg-white p-4">
+          <h3 class="text-sm font-semibold">
+            <a href={`/time/${city.slug}`} class="ring-focus hover:underline">
+              {city.name}
+            </a>
+          </h3>
+          <p class="nums mt-1 text-xs text-paper-500">{city.timeZone.replace(/_/g, ' ')}</p>
+          <p class="mt-2 text-sm leading-relaxed text-paper-700">
+            {profile.observesDst ? (
+              <>
+                Changes clocks twice a year, between{' '}
+                <span class="nums">UTC{formatOffset(profile.standardOffset)}</span> and{' '}
+                <span class="nums">UTC{formatOffset(profile.dstOffset!)}</span>.
+                {profile.nextTransition && (
+                  <>
+                    {' '}
+                    Next change{' '}
+                    {formatIsoDateLong(toIsoDate(profile.nextTransition.at, city.timeZone))}.
+                  </>
+                )}
+              </>
+            ) : (
+              <>
+                Never changes clocks. Fixed at{' '}
+                <span class="nums">UTC{formatOffset(profile.standardOffset)}</span> all year.
+              </>
+            )}
+          </p>
+        </div>
+      ))
+    }
+  </section>
+
+  <!-- ------------------------------------------------------------------ next -->
+  <section class="mt-10 flex flex-wrap gap-2">
+    <a
+      href={`/?${seedQuery}`}
+      class="ring-focus rounded-lg bg-paper-900 px-4 py-2 text-sm font-medium text-paper-50 hover:opacity-90"
+    >
+      Put both on a world clock
+    </a>
+    <a
+      href={`/overlap?${seedQuery}`}
+      class="ring-focus rounded-lg border border-paper-200 bg-white px-4 py-2 text-sm font-medium text-paper-700 hover:border-paper-300"
+    >
+      Find a meeting time for both
+    </a>
+  </section>
+
+  <!-- ------------------------------------------------------------------- faq -->
+  <section class="mt-14 max-w-2xl">
+    <h2 class="text-xl font-semibold tracking-tight">Questions</h2>
+    <dl class="mt-5 space-y-6">
+      {
+        faqs.map((f) => (
+          <div>
+            <dt class="text-sm font-medium">{f.q}</dt>
+            <dd class="mt-1.5 text-sm leading-relaxed text-paper-700">{f.a}</dd>
+          </div>
+        ))
+      }
+    </dl>
+  </section>
+</Base>

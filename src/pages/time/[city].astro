@@ -1,0 +1,390 @@
+---
+import Base from '../../layouts/Base.astro';
+import CityClock from '../../components/CityClock.tsx';
+import { CITIES, COMPARISON_CITIES, citiesSharingZone, type City } from '../../lib/time/cities';
+import {
+  describeDifference,
+  dstProfile,
+  formatGap,
+  formatGapShort,
+  gapOnDate,
+} from '../../lib/time/difference';
+import { sunTimes } from '../../lib/time/solar';
+import { formatIsoDateLong, formatMinutes, formatOffset, toIsoDate } from '../../lib/time/zone';
+
+export function getStaticPaths() {
+  return CITIES.map((city) => ({ params: { city: city.slug }, props: { city } }));
+}
+
+interface Props {
+  city: City;
+}
+
+const { city } = Astro.props;
+
+/*
+ * Everything below is computed at build time. Offsets, daylight saving dates and
+ * sunrise tables do not change between deploys, so shipping them as static HTML
+ * means the page answers the question before any JavaScript runs. Only the
+ * current time is left to the client.
+ */
+const buildInstant = new Date();
+const buildDate = toIsoDate(buildInstant, city.timeZone);
+const year = Number(buildDate.slice(0, 4));
+
+const profile = dstProfile(city.timeZone, buildInstant, 14);
+const sharesZone = citiesSharingZone(city);
+
+/** Differences to the cities people convert to most, for a static table. */
+const comparisons = COMPARISON_CITIES.filter((c) => c.slug !== city.slug).map((other) => {
+  const diff = describeDifference(city.timeZone, other.timeZone, buildDate, 400);
+  return {
+    other,
+    diff,
+    gapNow: gapOnDate(city.timeZone, other.timeZone, buildDate),
+    href: pairHref(city, other),
+  };
+});
+
+/**
+ * Link to a pair page only when one was actually generated.
+ *
+ * The conditions have to match `hubPairs()` exactly: both cities must be hubs,
+ * and they must be in different zones, because a pair whose gap is permanently
+ * zero gets no page. Duplicating the rule here is what produced two dead links
+ * on the first build, so it is asserted rather than assumed.
+ */
+function pairHref(a: City, b: City): string | null {
+  if (!a.isHub || !b.isHub) return null;
+  if (a.timeZone === b.timeZone) return null;
+  // Alphabetical, so /difference/london/sydney and the reverse do not both exist
+  // and split whatever ranking the page earns.
+  const [first, second] = a.slug < b.slug ? [a, b] : [b, a];
+  return `/difference/${first.slug}/${second.slug}`;
+}
+
+/** Sunrise, sunset and daylight on the 21st of each month: near the solstices. */
+const daylightByMonth = Array.from({ length: 12 }, (_, i) => {
+  const iso = `${year}-${String(i + 1).padStart(2, '0')}-21`;
+  const sun = sunTimes(iso, city.lat);
+  return {
+    label: new Intl.DateTimeFormat('en', { timeZone: 'UTC', month: 'long' }).format(
+      new Date(Date.UTC(year, i, 21)),
+    ),
+    ...sun,
+  };
+});
+
+const shortest = daylightByMonth.reduce((min, m) =>
+  m.daylightMinutes < min.daylightMinutes ? m : min,
+);
+const longest = daylightByMonth.reduce((max, m) =>
+  m.daylightMinutes > max.daylightMinutes ? m : max,
+);
+
+const varyingComparisons = comparisons.filter((c) => c.diff.varies);
+
+const zoneLabel = city.timeZone === 'UTC' ? 'UTC' : city.timeZone.replace(/_/g, ' ');
+
+const title = `Time in ${city.name} — current local time, UTC offset and daylight saving dates`;
+const description = profile.observesDst
+  ? `The current time in ${city.name}, ${city.country}. ${city.name} is on UTC${formatOffset(profile.standardOffset)} in standard time and UTC${formatOffset(profile.dstOffset!)} on daylight saving, so its distance from other cities changes during the year. Includes the exact change dates.`
+  : `The current time in ${city.name}, ${city.country}. ${city.name} stays on UTC${formatOffset(profile.standardOffset)} all year and never changes its clocks — but its distance from cities that do still moves. Includes the dates that happens.`;
+
+const faqs = [
+  {
+    q: `What time zone is ${city.name} in?`,
+    a: `${city.name} uses the IANA time zone ${city.timeZone}${
+      profile.observesDst
+        ? `, which is UTC${formatOffset(profile.standardOffset)} in standard time and UTC${formatOffset(profile.dstOffset!)} while daylight saving is in force.`
+        : `, a fixed UTC${formatOffset(profile.standardOffset)} with no daylight saving.`
+    }${sharesZone.length > 0 ? ` The same zone covers ${sharesZone.map((c) => c.name).join(', ')}.` : ''}`,
+  },
+  {
+    q: `Does ${city.name} observe daylight saving time?`,
+    a: profile.observesDst
+      ? `Yes. Clocks in ${city.name} move by ${(profile.dstOffset! - profile.standardOffset) / 60} hour${profile.dstOffset! - profile.standardOffset === 60 ? '' : 's'}${
+          profile.nextTransition
+            ? `, and the next change is on ${formatIsoDateLong(toIsoDate(profile.nextTransition.at, city.timeZone))}.`
+            : '.'
+        }`
+      : `No. ${city.name} stays on UTC${formatOffset(profile.standardOffset)} all year. That does not mean the gap between ${city.name} and other cities is fixed, though: when a city that does observe daylight saving changes its clocks, the difference between you and them moves even though nothing changed here.`,
+  },
+  {
+    q: `Why does the time difference to ${city.name} keep changing?`,
+    a:
+      varyingComparisons.length > 0
+        ? `Because the two places do not change their clocks on the same weekend, and in opposite hemispheres they change in opposite directions. ${varyingComparisons[0].other.name} is a clear example: it sits ${varyingComparisons[0].diff.distinctGaps.map((g) => formatGap(g)).join(', then ')} across the year rather than one fixed distance.`
+        : `For the cities listed on this page the difference happens to stay constant, because none of the pairs involved change their clocks at different times. That is the exception rather than the rule.`,
+  },
+  {
+    q: `How much daylight does ${city.name} get?`,
+    a: `Around ${(longest.daylightMinutes / 60).toFixed(1)} hours at the longest, in ${longest.label}, and about ${(shortest.daylightMinutes / 60).toFixed(1)} hours at the shortest, in ${shortest.label}. The table on this page lists sunrise and sunset through the year. Times are calculated from ${city.name}'s latitude of ${city.lat.toFixed(2)}\u00b0 and are approximate to within about an hour for cities that sit well away from the centre of their time zone.`,
+  },
+];
+---
+
+<Base title={title} description={description} path={`/time/${city.slug}`}>
+  <script
+    type="application/ld+json"
+    slot="head"
+    set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: faqs.map((f) => ({
+        '@type': 'Question',
+        name: f.q,
+        acceptedAnswer: { '@type': 'Answer', text: f.a },
+      })),
+    })}
+  />
+
+  <nav aria-label="Breadcrumb" class="mb-5 text-xs text-paper-500">
+    <a href="/" class="ring-focus hover:text-paper-900">World clock</a>
+    <span aria-hidden="true" class="mx-1.5">/</span>
+    <span aria-current="page">{city.name}</span>
+  </nav>
+
+  <header class="mb-6 max-w-2xl">
+    <h1 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+      Time in {city.name}
+    </h1>
+    <p class="mt-2 text-sm text-paper-700">
+      {city.country} &middot; <span class="nums">{zoneLabel}</span> &middot; latitude{' '}
+      <span class="nums">{city.lat.toFixed(2)}&deg;</span>
+    </p>
+  </header>
+
+  <CityClock name={city.name} timeZone={city.timeZone} latitude={city.lat} client:load />
+
+  <!-- ------------------------------------------------------- zone summary -->
+  <section class="mt-10 max-w-2xl">
+    <h2 class="text-xl font-semibold tracking-tight">
+      {
+        profile.observesDst
+          ? `${city.name} changes its clocks twice a year`
+          : `${city.name} never changes its clocks`
+      }
+    </h2>
+
+    {
+      profile.observesDst ? (
+        <p class="mt-3 text-sm leading-relaxed text-paper-700">
+          Standard time is <span class="nums">UTC{formatOffset(profile.standardOffset)}</span> and
+          daylight saving time is <span class="nums">UTC{formatOffset(profile.dstOffset!)}</span>.
+          The shift is {(profile.dstOffset! - profile.standardOffset) / 60}
+          {profile.dstOffset! - profile.standardOffset === 60 ? ' hour' : ' hours'}, and it is the
+          reason the distance between {city.name} and anywhere else is not a single number.
+        </p>
+      ) : (
+        <p class="mt-3 text-sm leading-relaxed text-paper-700">
+          {city.name} stays on <span class="nums">UTC{formatOffset(profile.standardOffset)}</span>{' '}
+          all year round. This is worth being careful about rather than relaxed about: the gap
+          between {city.name} and a city that does observe daylight saving still moves twice a year,
+          because the other end moved. A recurring call can drift by an hour without anything
+          changing here at all.
+        </p>
+      )
+    }
+
+    {
+      profile.transitions.length > 0 && (
+        <div class="mt-4 overflow-x-auto rounded-xl border border-paper-200 bg-white">
+          <table class="w-full text-sm">
+            <caption class="sr-only">Upcoming clock changes in {city.name}</caption>
+            <thead>
+              <tr class="border-b border-paper-100 text-left text-xs text-paper-500">
+                <th scope="col" class="px-3 py-2 font-medium">
+                  Date
+                </th>
+                <th scope="col" class="px-3 py-2 font-medium">
+                  Local time
+                </th>
+                <th scope="col" class="px-3 py-2 font-medium">
+                  Change
+                </th>
+                <th scope="col" class="px-3 py-2 font-medium">
+                  New offset
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {profile.transitions.map((t) => (
+                <tr class="border-b border-paper-100 last:border-b-0">
+                  <td class="px-3 py-2">{formatIsoDateLong(toIsoDate(t.at, city.timeZone))}</td>
+                  <td class="nums px-3 py-2">
+                    {formatMinutes(t.at.getUTCHours() * 60 + t.at.getUTCMinutes() + t.offsetBefore)}
+                    {' \u2192 '}
+                    {formatMinutes(t.at.getUTCHours() * 60 + t.at.getUTCMinutes() + t.offsetAfter)}
+                  </td>
+                  <td class="px-3 py-2">
+                    {t.deltaMinutes > 0 ? 'Forward' : 'Back'} {Math.abs(t.deltaMinutes)} min
+                  </td>
+                  <td class="nums px-3 py-2">UTC{formatOffset(t.offsetAfter)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )
+    }
+
+    {
+      sharesZone.length > 0 && (
+        <p class="mt-3 text-xs leading-relaxed text-paper-500">
+          Same clock, different sky:{' '}
+          {sharesZone.map((c, i) => (
+            <>
+              {i > 0 && ', '}
+              <a href={`/time/${c.slug}`} class="ring-focus underline hover:text-paper-900">
+                {c.name}
+              </a>
+            </>
+          ))}{' '}
+          share {city.timeZone}. Sunrise and sunset differ between them because latitude does, even
+          though the clock does not.
+        </p>
+      )
+    }
+  </section>
+
+  <!-- --------------------------------------------------- difference table -->
+  <section class="mt-12">
+    <h2 class="text-xl font-semibold tracking-tight">
+      Time difference from {city.name}
+    </h2>
+    <p class="mt-2 max-w-2xl text-sm leading-relaxed text-paper-700">
+      Where a range is shown, the gap genuinely changes during the year. That is not rounding or
+      hedging &mdash; it is two governments moving their clocks on different weekends.
+    </p>
+
+    <div class="mt-4 overflow-x-auto rounded-xl border border-paper-200 bg-white">
+      <table class="w-full text-sm">
+        <caption class="sr-only">Time difference between {city.name} and other cities</caption>
+        <thead>
+          <tr class="border-b border-paper-100 text-left text-xs text-paper-500">
+            <th scope="col" class="px-3 py-2 font-medium">City</th>
+            <th scope="col" class="px-3 py-2 font-medium">Difference now</th>
+            <th scope="col" class="px-3 py-2 font-medium">Across the year</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            comparisons.map(({ other, diff, gapNow, href }) => (
+              <tr class="border-b border-paper-100 last:border-b-0">
+                <td class="px-3 py-2">
+                  {href ? (
+                    <a href={href} class="ring-focus underline hover:text-paper-900">
+                      {other.name}
+                    </a>
+                  ) : (
+                    <a
+                      href={`/time/${other.slug}`}
+                      class="ring-focus underline hover:text-paper-900"
+                    >
+                      {other.name}
+                    </a>
+                  )}
+                </td>
+                <td class="nums px-3 py-2">{formatGap(gapNow)}</td>
+                <td class="nums px-3 py-2 text-paper-500">
+                  {diff.varies
+                    ? diff.distinctGaps.map((g) => formatGapShort(g)).join(' / ')
+                    : 'constant'}
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ------------------------------------------------------ daylight table -->
+  <section class="mt-12">
+    <h2 class="text-xl font-semibold tracking-tight">Daylight in {city.name} through the year</h2>
+    <p class="mt-2 max-w-2xl text-sm leading-relaxed text-paper-700">
+      From about {(shortest.daylightMinutes / 60).toFixed(1)} hours in {shortest.label} to{' '}
+      {(longest.daylightMinutes / 60).toFixed(1)} hours in {longest.label}. This is the part a plain
+      clock leaves out: 17:00 is a bright evening in one month and long dark in another.
+    </p>
+
+    <div class="mt-4 overflow-x-auto rounded-xl border border-paper-200 bg-white">
+      <table class="w-full text-sm">
+        <caption class="sr-only">
+          Sunrise, sunset and daylight length in {city.name}, on the 21st of each month
+        </caption>
+        <thead>
+          <tr class="border-b border-paper-100 text-left text-xs text-paper-500">
+            <th scope="col" class="px-3 py-2 font-medium">Month</th>
+            <th scope="col" class="px-3 py-2 font-medium">Sunrise</th>
+            <th scope="col" class="px-3 py-2 font-medium">Sunset</th>
+            <th scope="col" class="px-3 py-2 font-medium">Daylight</th>
+          </tr>
+        </thead>
+        <tbody>
+          {
+            daylightByMonth.map((m) => (
+              <tr class="border-b border-paper-100 last:border-b-0">
+                <td class="px-3 py-2">{m.label}</td>
+                <td class="nums px-3 py-2">
+                  {m.sunrise === null
+                    ? m.polar
+                      ? 'no sunset'
+                      : 'no sunrise'
+                    : formatMinutes(m.sunrise)}
+                </td>
+                <td class="nums px-3 py-2">
+                  {m.sunset === null
+                    ? m.polar
+                      ? 'no sunset'
+                      : 'no sunrise'
+                    : formatMinutes(m.sunset)}
+                </td>
+                <td class="nums px-3 py-2 text-paper-500">
+                  {Math.floor(m.daylightMinutes / 60)}h {m.daylightMinutes % 60}m
+                </td>
+              </tr>
+            ))
+          }
+        </tbody>
+      </table>
+    </div>
+    <p class="mt-2 text-xs leading-relaxed text-paper-500">
+      Daylight length is accurate. The clock times of sunrise and sunset assume each city sits at
+      the centre of its time zone, which can put them up to about an hour and a quarter out for
+      places near a zone's edge &mdash; Madrid being the standard example. Day length is unaffected.
+    </p>
+  </section>
+
+  <!-- ---------------------------------------------------------------- next -->
+  <section class="mt-12 flex flex-wrap gap-2">
+    <a
+      href={`/?p=${city.timeZone}-540-1020-12345`}
+      class="ring-focus rounded-lg bg-paper-900 px-4 py-2 text-sm font-medium text-paper-50 hover:opacity-90"
+    >
+      Add {city.name} to a world clock
+    </a>
+    <a
+      href={`/overlap?p=${city.timeZone}-540-1020-12345`}
+      class="ring-focus rounded-lg border border-paper-200 bg-white px-4 py-2 text-sm font-medium text-paper-700 hover:border-paper-300"
+    >
+      Find a meeting time with {city.name}
+    </a>
+  </section>
+
+  <!-- ----------------------------------------------------------------- faq -->
+  <section class="mt-14 max-w-2xl">
+    <h2 class="text-xl font-semibold tracking-tight">Questions</h2>
+    <dl class="mt-5 space-y-6">
+      {
+        faqs.map((f) => (
+          <div>
+            <dt class="text-sm font-medium">{f.q}</dt>
+            <dd class="mt-1.5 text-sm leading-relaxed text-paper-700">{f.a}</dd>
+          </div>
+        ))
+      }
+    </dl>
+  </section>
+</Base>

@@ -1,0 +1,85 @@
+---
+import Base from '../layouts/Base.astro';
+import WorldClock from '../components/WorldClock.tsx';
+
+const title = 'World Clock — current time in every city, and whether it is dark there';
+const description =
+  'A clean world clock with a time slider. See the current time in any city, whether the sun is up, and how far ahead or behind you they are. Share your city list as a single link.';
+
+const faqs = [
+  {
+    q: 'What does the coloured bar under each city mean?',
+    a: "It is that city's whole day, from local midnight to midnight, shaded for daylight, twilight and darkness. The vertical marker is the moment you are looking at. It answers the question a plain clock cannot: not just what time it is there, but whether it is a reasonable hour to call.",
+  },
+  {
+    q: 'How is daylight worked out?',
+    a: "From the city's latitude and the date, using the standard solar position method. Latitude is stored per city rather than per time zone, because Miami and Boston share a clock but sit sixteen degrees apart, which puts about an hour and a half between their winter sunsets.",
+  },
+  {
+    q: 'What is the slider for?',
+    a: 'Pick any hour in your base city and every other city updates to match. It answers "if I schedule this for 3pm my time, what time is that for them" without any arithmetic. Press "Back to now" to return to the live clock.',
+  },
+  {
+    q: 'Do you store my cities?',
+    a: 'No. There is no account and no database. Your city list is encoded in the address bar, which is why you can bookmark it, reload it, or paste the link to a colleague and have them see exactly the same thing.',
+  },
+  {
+    q: 'Where does the time zone data come from?',
+    a: 'Your own device. Browsers ship the IANA time zone database and expose it through the Intl API, so offsets and daylight saving rules are as current as your operating system. Nothing is bundled here that could quietly go stale.',
+  },
+];
+---
+
+<Base title={title} description={description} path="/">
+  <script
+    type="application/ld+json"
+    slot="head"
+    set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: faqs.map((f) => ({
+        '@type': 'Question',
+        name: f.q,
+        acceptedAnswer: { '@type': 'Answer', text: f.a },
+      })),
+    })}
+  />
+
+  <header class="mb-7 max-w-2xl">
+    <h1 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">World clock</h1>
+    <p class="mt-3 text-paper-700">
+      Current time in the cities you care about, with the one thing other clocks leave out &mdash;
+      whether it is actually light there. Drag the slider to try a different hour.
+    </p>
+  </header>
+
+  <WorldClock client:load />
+
+  <section class="mt-20 max-w-2xl">
+    <h2 class="text-xl font-semibold tracking-tight">Why the daylight bar matters</h2>
+    <p class="mt-3 text-sm leading-relaxed text-paper-700">
+      "It is 16:00 in Stockholm" is a fact with almost no useful content. In June that is the middle
+      of a long bright evening; in December the sun set an hour ago. The number is identical and the
+      answer to "should I call now" is the opposite.
+    </p>
+    <p class="mt-3 text-sm leading-relaxed text-paper-700">
+      That is why every city here carries its own latitude rather than borrowing one from its time
+      zone. Miami and Boston both run on <span class="whitespace-nowrap">America/New_York</span>,
+      yet in midwinter the sun is still up in one and long gone in the other.
+    </p>
+  </section>
+
+  <section class="mt-12 max-w-2xl">
+    <h2 class="text-xl font-semibold tracking-tight">Questions</h2>
+    <dl class="mt-5 space-y-6">
+      {
+        faqs.map((f) => (
+          <div>
+            <dt class="text-sm font-medium">{f.q}</dt>
+            <dd class="mt-1.5 text-sm leading-relaxed text-paper-700">{f.a}</dd>
+          </div>
+        ))
+      }
+    </dl>
+  </section>
+</Base>

@@ -1,0 +1,88 @@
+---
+import Base from '../layouts/Base.astro';
+import TeamPlanner from '../components/TeamPlanner.tsx';
+
+const title = 'Meeting time finder — overlapping working hours across time zones';
+const description =
+  'Find the hours a distributed team is actually free, then get a warning for every daylight saving date that will move the meeting. No sign-up; the whole scenario lives in a shareable link.';
+
+const faqs = [
+  {
+    q: 'What counts as an overlap here?',
+    a: 'An hour where every person is inside their own working hours on their own working days. The darker green columns are the ones that work for everybody; the pale green means only some people are free. If nothing is dark green, the honest answer is that these hours do not line up, and the tool says so rather than suggesting a bad slot.',
+  },
+  {
+    q: 'Why does daylight saving matter for a recurring meeting?',
+    a: "Countries move their clocks on different weekends and in opposite directions between hemispheres, so a call fixed at one city's 9am drifts several times a year rather than twice. Between the northern spring change and the southern autumn change there is a period of a few weeks where the gap between, say, London and Sydney is different from the rest of the year.",
+  },
+  {
+    q: 'My colleague is in a country with no daylight saving. Are they safe?',
+    a: 'No, and this is the part that catches teams out. If the meeting is pinned to a city that changes its clocks, then everyone else moves relative to it. Tokyo, Kolkata, Singapore and Brisbane have no daylight saving at all, yet a meeting anchored to London will still arrive an hour earlier or later for them twice a year.',
+  },
+  {
+    q: 'How do I share the result?',
+    a: 'Copy the link. It carries every person, their hours, the base city and the chosen time, so whoever opens it sees exactly your scenario and can adjust their own row. There is also a plain-text block formatted for pasting into a calendar invite.',
+  },
+  {
+    q: 'Do the cities carry over from the world clock?',
+    a: 'Yes. Both views read the same list out of the address bar, so moving between the clock and the planner never asks you to type your cities a second time.',
+  },
+];
+---
+
+<Base title={title} description={description} path="/overlap">
+  <script
+    type="application/ld+json"
+    slot="head"
+    set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'FAQPage',
+      mainEntity: faqs.map((f) => ({
+        '@type': 'Question',
+        name: f.q,
+        acceptedAnswer: { '@type': 'Answer', text: f.a },
+      })),
+    })}
+  />
+
+  <header class="mb-7 max-w-2xl">
+    <h1 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+      When is everyone free?
+    </h1>
+    <p class="mt-3 text-paper-700">
+      Set each person's working hours and days. The grid shows the hours that suit everybody &mdash;
+      and, once you pick one, every daylight saving date that will quietly move it.
+    </p>
+  </header>
+
+  <TeamPlanner client:load />
+
+  <section class="mt-20 max-w-2xl">
+    <h2 class="text-xl font-semibold tracking-tight">The bit that breaks recurring calls</h2>
+    <p class="mt-3 text-sm leading-relaxed text-paper-700">
+      Most planners answer the easy question: what is 3pm here over there, today. That answer has a
+      shelf life. Pick a weekly call and the arithmetic changes up to four times a year, because the
+      two cities do not change their clocks on the same weekend, and in different hemispheres they
+      move in opposite directions.
+    </p>
+    <p class="mt-3 text-sm leading-relaxed text-paper-700">
+      So once you choose a time, this page projects it forward a year and lists the dates where
+      somebody's local time changes. Those are the weeks a standing invite silently lands at 7am for
+      one person, or after dinner for another.
+    </p>
+  </section>
+
+  <section class="mt-12 max-w-2xl">
+    <h2 class="text-xl font-semibold tracking-tight">Questions</h2>
+    <dl class="mt-5 space-y-6">
+      {
+        faqs.map((f) => (
+          <div>
+            <dt class="text-sm font-medium">{f.q}</dt>
+            <dd class="mt-1.5 text-sm leading-relaxed text-paper-700">{f.a}</dd>
+          </div>
+        ))
+      }
+    </dl>
+  </section>
+</Base>

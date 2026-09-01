@@ -1,0 +1,135 @@
+@import 'tailwindcss';
+
+/*
+ * Deliberately not the default slate-and-indigo palette that every generated
+ * site ships with. Warm paper ground, near-black text, one saturated accent
+ * used only to mean "yes, you can meet here".
+ */
+@theme {
+  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+
+  --color-paper-50: oklch(0.993 0.004 85);
+  --color-paper-100: oklch(0.972 0.006 85);
+  --color-paper-200: oklch(0.932 0.008 85);
+  /* Borders and dividers only. Too light to carry text or an icon — use 500. */
+  --color-paper-300: oklch(0.872 0.009 85);
+  /*
+   * The lightest tone allowed to carry text. Measured, not eyeballed: at the
+   * original 0.62 this sat at 3.6:1 against the page, which fails WCAG AA for
+   * the 10 and 11 pixel labels it is used for. 0.54 clears 4.5:1 against the
+   * page, cards and the subtle fill alike while still reading as muted.
+   */
+  --color-paper-500: oklch(0.54 0.012 85);
+  --color-paper-700: oklch(0.44 0.014 80);
+  --color-paper-900: oklch(0.235 0.014 75);
+
+  /* Overlap = everyone awake. The only place saturated colour is allowed. */
+  --color-go-100: oklch(0.94 0.06 168);
+  --color-go-300: oklch(0.83 0.11 168);
+  --color-go-500: oklch(0.66 0.13 168);
+  --color-go-700: oklch(0.48 0.11 168);
+
+  /* Daylight saving warnings. */
+  --color-warn-100: oklch(0.95 0.055 75);
+  --color-warn-400: oklch(0.79 0.13 68);
+  --color-warn-700: oklch(0.5 0.12 55);
+
+  /* Sky states. Warm daylight, dim dusk, deep night — readable at 6px tall. */
+  --color-sky-day: oklch(0.87 0.11 88);
+  --color-sky-dusk: oklch(0.66 0.1 45);
+  --color-sky-night: oklch(0.33 0.05 265);
+}
+
+/*
+ * SKY-DRIVEN THEMING
+ *
+ * The whole premise of this site is "is it light there". So the page itself
+ * follows the sky where the reader actually is: warm paper in daylight, dusk
+ * tones at twilight, deep blue-black at night.
+ *
+ * Every Tailwind colour utility compiles to `var(--color-*)`, so re-pointing
+ * those variables under a `[data-sky]` attribute re-themes the entire site
+ * without touching a single component. The dark palettes invert the *roles* of
+ * the ramp rather than just darkening it: `paper-50` is always the page ground
+ * and `paper-900` is always the strongest text, so existing pairings keep their
+ * contrast.
+ *
+ * This is meant to be atmosphere, not decoration. Body text stays above roughly
+ * 12:1 against its ground in all three states.
+ */
+
+[data-sky='twilight'] {
+  --color-paper-50: oklch(0.243 0.026 45);
+  --color-white: oklch(0.288 0.028 45);
+  --color-paper-100: oklch(0.34 0.028 45);
+  --color-paper-200: oklch(0.402 0.028 45);
+  --color-paper-300: oklch(0.5 0.028 45);
+  --color-paper-500: oklch(0.72 0.022 60);
+  --color-paper-700: oklch(0.872 0.016 70);
+  --color-paper-900: oklch(0.968 0.011 80);
+
+  --color-go-100: oklch(0.33 0.05 168);
+  --color-go-300: oklch(0.47 0.09 168);
+  --color-go-500: oklch(0.62 0.12 168);
+  --color-go-700: oklch(0.75 0.1 168);
+
+  --color-warn-100: oklch(0.335 0.055 65);
+  --color-warn-400: oklch(0.64 0.12 68);
+  --color-warn-700: oklch(0.87 0.085 80);
+}
+
+[data-sky='night'] {
+  --color-paper-50: oklch(0.188 0.018 265);
+  --color-white: oklch(0.234 0.02 265);
+  --color-paper-100: oklch(0.281 0.02 265);
+  --color-paper-200: oklch(0.342 0.022 265);
+  --color-paper-300: oklch(0.452 0.022 265);
+  --color-paper-500: oklch(0.688 0.016 265);
+  --color-paper-700: oklch(0.845 0.013 90);
+  --color-paper-900: oklch(0.963 0.008 90);
+
+  --color-go-100: oklch(0.305 0.05 168);
+  --color-go-300: oklch(0.45 0.09 168);
+  --color-go-500: oklch(0.6 0.12 168);
+  --color-go-700: oklch(0.73 0.1 168);
+
+  --color-warn-100: oklch(0.315 0.055 65);
+  --color-warn-400: oklch(0.62 0.12 68);
+  --color-warn-700: oklch(0.855 0.085 80);
+}
+
+/*
+ * The date input's own calendar glyph is drawn by the browser in a fixed dark
+ * ink, which disappears against a dark field. Inverting it is the only hook the
+ * platform exposes.
+ */
+[data-sky='night'] input[type='date']::-webkit-calendar-picker-indicator,
+[data-sky='twilight'] input[type='date']::-webkit-calendar-picker-indicator {
+  filter: invert(1) opacity(0.7);
+}
+
+[data-sky='night'],
+[data-sky='twilight'] {
+  color-scheme: dark;
+}
+
+/* Digits must not reflow as the clock ticks. */
+.nums {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum';
+}
+
+/* Focus ring that survives on both paper and dark cells. */
+.ring-focus:focus-visible {
+  outline: 2px solid var(--color-paper-900);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
