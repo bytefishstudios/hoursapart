@@ -1,12 +1,21 @@
 @import 'tailwindcss';
 
 /*
+ * Inter, self-hosted rather than pulled from a CDN. A site whose whole pitch is
+ * "nothing you enter is uploaded" should not open a connection to a third party
+ * to render its own text. `opsz` is the variable optical-size axis, which tunes
+ * letterforms for display sizes — the headlines need it, the body text does not.
+ */
+@import '@fontsource-variable/inter';
+
+/*
  * Deliberately not the default slate-and-indigo palette that every generated
  * site ships with. Warm paper ground, near-black text, one saturated accent
  * used only to mean "yes, you can meet here".
  */
 @theme {
-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  --font-sans:
+    'Inter Variable', Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 
   --color-paper-50: oklch(0.993 0.004 85);
   --color-paper-100: oklch(0.972 0.006 85);
@@ -38,6 +47,19 @@
   --color-sky-day: oklch(0.87 0.11 88);
   --color-sky-dusk: oklch(0.66 0.1 45);
   --color-sky-night: oklch(0.33 0.05 265);
+
+  /*
+   * ELEVATION
+   *
+   * Warm-tinted rather than neutral grey: a grey shadow on warm paper reads as
+   * dirt. Two layers each — a tight contact shadow to seat the edge, and a wide
+   * soft one for the lift. Re-pointed under each [data-sky] block below, because
+   * on a dark ground a black shadow is invisible and the lift has to come from a
+   * light top edge instead.
+   */
+  --shadow-card: 0 1px 2px oklch(0.42 0.03 75 / 0.05), 0 3px 10px oklch(0.42 0.03 75 / 0.055);
+  --shadow-lift: 0 2px 4px oklch(0.42 0.03 75 / 0.07), 0 14px 32px oklch(0.42 0.03 75 / 0.1);
+  --shadow-well: inset 0 1px 3px oklch(0.42 0.03 75 / 0.09);
 }
 
 /*
@@ -76,6 +98,11 @@
   --color-warn-100: oklch(0.335 0.055 65);
   --color-warn-400: oklch(0.64 0.12 68);
   --color-warn-700: oklch(0.87 0.085 80);
+
+  /* On a dark ground the lift has to come from a lit top edge, not a shadow. */
+  --shadow-card: 0 1px 0 oklch(1 0 0 / 0.05) inset, 0 2px 8px oklch(0.1 0.02 45 / 0.34);
+  --shadow-lift: 0 1px 0 oklch(1 0 0 / 0.07) inset, 0 12px 30px oklch(0.1 0.02 45 / 0.44);
+  --shadow-well: inset 0 1px 3px oklch(0.1 0.02 45 / 0.4);
 }
 
 [data-sky='night'] {
@@ -96,6 +123,10 @@
   --color-warn-100: oklch(0.315 0.055 65);
   --color-warn-400: oklch(0.62 0.12 68);
   --color-warn-700: oklch(0.855 0.085 80);
+
+  --shadow-card: 0 1px 0 oklch(1 0 0 / 0.05) inset, 0 2px 8px oklch(0.08 0.02 265 / 0.4);
+  --shadow-lift: 0 1px 0 oklch(1 0 0 / 0.07) inset, 0 12px 30px oklch(0.08 0.02 265 / 0.5);
+  --shadow-well: inset 0 1px 3px oklch(0.08 0.02 265 / 0.45);
 }
 
 /*
@@ -119,6 +150,191 @@
   font-feature-settings: 'tnum';
 }
 
+/*
+ * A single wash of warm light from the top of the page. Sized in vmax so it
+ * scales with the viewport instead of banding on wide screens. Purely
+ * atmospheric — it sits behind everything and never carries text.
+ */
+/*
+ * Inter ships a tall x-height and loose default tracking that reads as slightly
+ * wide at display sizes. Optical sizing plus a touch of negative tracking on the
+ * big type is what separates "used Inter" from "set Inter properly".
+ */
+html {
+  font-optical-sizing: auto;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+h1,
+h2,
+h3 {
+  letter-spacing: -0.021em;
+}
+
+body {
+  background-image: radial-gradient(
+    120vmax 60vmax at 50% -20vmax,
+    var(--color-paper-100) 0%,
+    transparent 60%
+  );
+  background-repeat: no-repeat;
+}
+
+@layer components {
+  /*
+   * ELEVATION CLASSES
+   *
+   * Deliberately not Tailwind's `shadow-*` utilities. Tailwind inlines a theme
+   * value at build time, so `shadow-card` bakes in the light-mode shadow and the
+   * per-sky overrides below would never apply — the dark palettes would silently
+   * lose their lift. Referencing the variable keeps elevation on the same
+   * re-pointing mechanism as every colour in the site.
+   */
+  .elev {
+    box-shadow: var(--shadow-card);
+  }
+  .elev-lift {
+    box-shadow: var(--shadow-lift);
+  }
+  .elev-hover {
+    transition: box-shadow 160ms ease;
+  }
+  .elev-hover:hover {
+    box-shadow: var(--shadow-lift);
+  }
+
+  /*
+   * THE SKY STRIP
+   *
+   * The product's whole argument in one element, so it gets real height and a
+   * true gradient rather than the abutted colour blocks it started as. The stops
+   * are written by the component as a custom property, because only it knows
+   * where this city's dawn and dusk actually fall.
+   */
+  .sky-strip {
+    background-image: linear-gradient(to right, var(--sky-stops));
+  }
+
+  /*
+   * Safari draws its own disclosure triangle and ignores `list-style: none`
+   * unless this pseudo-element is targeted directly.
+   */
+  summary::-webkit-details-marker {
+    display: none;
+  }
+
+  /* The now-marker. A hairline alone disappeared against mid-tone dusk. */
+  .sky-marker {
+    box-shadow:
+      0 0 0 1px oklch(1 0 0 / 0.55),
+      0 0 6px oklch(0.2 0.02 75 / 0.4);
+  }
+
+  /*
+   * Range input, restyled. The platform default is a grey pill that reads as
+   * unfinished next to everything else, and its thumb is too small to grab on
+   * touch. Track and thumb have to be declared per-engine; there is no
+   * shorthand that covers both.
+   */
+  .slider {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 100%;
+    height: 1.5rem;
+    background: transparent;
+    cursor: grab;
+  }
+  .slider:active {
+    cursor: grabbing;
+  }
+
+  .slider::-webkit-slider-runnable-track {
+    height: 0.5rem;
+    border-radius: 999px;
+    background: linear-gradient(
+      to right,
+      var(--color-sky-night) 0%,
+      var(--color-sky-dusk) 22%,
+      var(--color-sky-day) 46%,
+      var(--color-sky-day) 62%,
+      var(--color-sky-dusk) 80%,
+      var(--color-sky-night) 100%
+    );
+    box-shadow: var(--shadow-well);
+  }
+  .slider::-moz-range-track {
+    height: 0.5rem;
+    border-radius: 999px;
+    background: linear-gradient(
+      to right,
+      var(--color-sky-night) 0%,
+      var(--color-sky-dusk) 22%,
+      var(--color-sky-day) 46%,
+      var(--color-sky-day) 62%,
+      var(--color-sky-dusk) 80%,
+      var(--color-sky-night) 100%
+    );
+    box-shadow: var(--shadow-well);
+  }
+
+  .slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    height: 1.25rem;
+    width: 1.25rem;
+    margin-top: -0.375rem;
+    border-radius: 999px;
+    background: var(--color-paper-50);
+    border: 2px solid var(--color-paper-900);
+    box-shadow: var(--shadow-card);
+    transition: transform 120ms ease;
+  }
+  .slider::-moz-range-thumb {
+    height: 1.25rem;
+    width: 1.25rem;
+    border-radius: 999px;
+    background: var(--color-paper-50);
+    border: 2px solid var(--color-paper-900);
+    box-shadow: var(--shadow-card);
+    transition: transform 120ms ease;
+  }
+  .slider:hover::-webkit-slider-thumb,
+  .slider:active::-webkit-slider-thumb {
+    transform: scale(1.12);
+  }
+  .slider:hover::-moz-range-thumb,
+  .slider:active::-moz-range-thumb {
+    transform: scale(1.12);
+  }
+  .slider:focus-visible::-webkit-slider-thumb {
+    outline: 2px solid var(--color-paper-900);
+    outline-offset: 2px;
+  }
+  .slider:focus-visible::-moz-range-thumb {
+    outline: 2px solid var(--color-paper-900);
+    outline-offset: 2px;
+  }
+
+  /*
+   * Data tables. These pages are mostly table, so the header needs to hold its
+   * own tone and the rows need banding — at a dozen-plus rows of near-identical
+   * numbers, hairlines alone are not enough to track across.
+   */
+  .data-table thead tr {
+    background: var(--color-paper-100);
+  }
+  .data-table tbody tr:nth-child(even) {
+    background: color-mix(in oklab, var(--color-paper-100) 45%, transparent);
+  }
+  .data-table tbody tr {
+    transition: background-color 120ms ease;
+  }
+  .data-table tbody tr:hover {
+    background: var(--color-paper-100);
+  }
+}
+
 /* Focus ring that survives on both paper and dark cells. */
 .ring-focus:focus-visible {
   outline: 2px solid var(--color-paper-900);
@@ -131,5 +347,247 @@
   *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+/* Product shell details: a compact brand object and a useful, data-led hero. */
+.brand-mark {
+  background:
+    radial-gradient(
+      circle at 68% 28%,
+      color-mix(in oklab, var(--color-sky-day) 70%, transparent),
+      transparent 32%
+    ),
+    linear-gradient(145deg, var(--color-white), var(--color-paper-100));
+}
+
+.hero-preview {
+  isolation: isolate;
+  background:
+    radial-gradient(
+      circle at 12% 12%,
+      color-mix(in oklab, var(--color-go-100) 75%, transparent),
+      transparent 34%
+    ),
+    radial-gradient(
+      circle at 90% 94%,
+      color-mix(in oklab, var(--color-warn-100) 82%, transparent),
+      transparent 35%
+    ),
+    var(--color-white);
+}
+
+.hero-preview::before {
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  content: '';
+  opacity: 0.38;
+  background-image:
+    linear-gradient(to right, var(--color-paper-200) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-paper-200) 1px, transparent 1px);
+  background-size: 2rem 2rem;
+  mask-image: linear-gradient(to bottom, black, transparent 72%);
+}
+
+/* World-clock rows use a different information order on touch screens. */
+.city-row-layout {
+  display: grid;
+  grid-template-areas:
+    'sky identity time'
+    'day day day'
+    'strip strip strip'
+    'handle actions actions';
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: start;
+  column-gap: 0.75rem;
+  row-gap: 0.75rem;
+}
+
+.city-row-handle {
+  grid-area: handle;
+}
+
+.reorder-handle {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.reorder-handle:active,
+.city-clock-row.is-dragging .reorder-handle {
+  cursor: grabbing;
+}
+
+.city-row-sky-dot {
+  grid-area: sky;
+}
+
+.city-row-identity {
+  grid-area: identity;
+}
+
+.city-row-time {
+  grid-area: time;
+}
+
+.city-row-day {
+  grid-area: day;
+}
+
+.city-row-actions {
+  grid-area: actions;
+}
+
+.city-row-strip {
+  grid-area: strip;
+}
+
+@media (min-width: 640px) {
+  .city-row-layout {
+    grid-template-areas:
+      'handle sky identity time actions'
+      '. . day day .'
+      '. strip strip strip .';
+    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
+    align-items: center;
+    column-gap: 0.875rem;
+    row-gap: 0.625rem;
+  }
+}
+
+/* Detail-page atmosphere comes from the data, not decorative stock art. */
+.city-live-card::before,
+.pair-panel::before {
+  position: absolute;
+  inset: 0;
+  content: '';
+  pointer-events: none;
+  opacity: 0.42;
+}
+
+.city-live-day::before,
+.pair-panel-day::before {
+  background: radial-gradient(circle at 92% 5%, var(--color-sky-day), transparent 40%);
+}
+
+.city-live-twilight::before,
+.pair-panel-twilight::before {
+  background: radial-gradient(circle at 92% 5%, var(--color-sky-dusk), transparent 42%);
+}
+
+.city-live-night::before,
+.pair-panel-night::before {
+  background: radial-gradient(circle at 92% 5%, var(--color-sky-night), transparent 42%);
+  opacity: 0.25;
+}
+
+/* Tables become labelled records on phones; no squeezed dates or mystery scroll. */
+@media (max-width: 639px) {
+  .responsive-table thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+
+  .responsive-table,
+  .responsive-table tbody,
+  .responsive-table tr,
+  .responsive-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .responsive-table tbody {
+    display: grid;
+    gap: 0.625rem;
+    padding: 0.625rem;
+  }
+
+  .responsive-table tbody tr {
+    overflow: hidden;
+    border: 1px solid var(--color-paper-200);
+    border-radius: 0.75rem;
+    background: var(--color-white) !important;
+  }
+
+  .responsive-table tbody td {
+    display: grid;
+    grid-template-columns: minmax(6.5rem, 0.8fr) minmax(0, 1.2fr);
+    gap: 0.75rem;
+    align-items: baseline;
+    padding: 0.55rem 0.75rem;
+    border-bottom: 1px solid var(--color-paper-100);
+    text-align: right;
+  }
+
+  .responsive-table tbody td:last-child {
+    border-bottom: 0;
+  }
+
+  .responsive-table tbody td::before {
+    color: var(--color-paper-500);
+    font-family: var(--font-sans);
+    font-size: 0.625rem;
+    font-weight: 650;
+    letter-spacing: 0.08em;
+    text-align: left;
+    text-transform: uppercase;
+  }
+
+  .transitions-table td:nth-child(1)::before {
+    content: 'Date';
+  }
+  .transitions-table td:nth-child(2)::before {
+    content: 'Local time';
+  }
+  .transitions-table td:nth-child(3)::before {
+    content: 'Change';
+  }
+  .transitions-table td:nth-child(4)::before {
+    content: 'New offset';
+  }
+  .comparisons-table td:nth-child(1)::before {
+    content: 'City';
+  }
+  .comparisons-table td:nth-child(2)::before {
+    content: 'Difference now';
+  }
+  .comparisons-table td:nth-child(3)::before {
+    content: 'Across the year';
+  }
+  .daylight-table td:nth-child(1)::before {
+    content: 'Month';
+  }
+  .daylight-table td:nth-child(2)::before {
+    content: 'Sunrise';
+  }
+  .daylight-table td:nth-child(3)::before {
+    content: 'Sunset';
+  }
+  .daylight-table td:nth-child(4)::before {
+    content: 'Daylight';
+  }
+  .spans-table td:nth-child(1)::before {
+    content: 'From';
+  }
+  .spans-table td:nth-child(2)::before {
+    content: 'Until';
+  }
+  .spans-table td:nth-child(3)::before {
+    content: 'Difference';
+  }
+  .spans-table td:nth-child(4)::before {
+    content: 'Length';
+  }
+  .conversion-table td:nth-child(1)::before {
+    content: 'From';
+  }
+  .conversion-table td:nth-child(2)::before {
+    content: 'To';
   }
 }

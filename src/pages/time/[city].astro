@@ -1,6 +1,7 @@
 ---
 import Base from '../../layouts/Base.astro';
 import CityClock from '../../components/CityClock.tsx';
+import Faq from '../../components/Faq.astro';
 import { CITIES, COMPARISON_CITIES, citiesSharingZone, type City } from '../../lib/time/cities';
 import {
   describeDifference,
@@ -10,6 +11,7 @@ import {
   gapOnDate,
 } from '../../lib/time/difference';
 import { sunTimes } from '../../lib/time/solar';
+import { DEFAULT_MEETING_DURATION, encodeScenario } from '../../lib/time/share';
 import { formatIsoDateLong, formatMinutes, formatOffset, toIsoDate } from '../../lib/time/zone';
 
 export function getStaticPaths() {
@@ -21,6 +23,22 @@ interface Props {
 }
 
 const { city } = Astro.props;
+const cityQuery = encodeScenario({
+  participants: [
+    {
+      id: 'p0',
+      label: city.name,
+      timeZone: city.timeZone,
+      workStart: 9 * 60,
+      workEnd: 17 * 60,
+      workDays: [1, 2, 3, 4, 5],
+    },
+  ],
+  anchorIndex: 0,
+  meetingMinutes: null,
+  durationMinutes: DEFAULT_MEETING_DURATION,
+  date: null,
+});
 
 /*
  * Everything below is computed at build time. Offsets, daylight saving dates and
@@ -86,7 +104,13 @@ const varyingComparisons = comparisons.filter((c) => c.diff.varies);
 
 const zoneLabel = city.timeZone === 'UTC' ? 'UTC' : city.timeZone.replace(/_/g, ' ');
 
-const title = `Time in ${city.name} — current local time, UTC offset and daylight saving dates`;
+const seoOrigin = (Astro.site?.href ?? 'https://hoursapart.app/').replace(/\/$/, '');
+/*
+ * Kept under ~60 characters so nothing important is truncated in results. The
+ * money phrase "Time in <city>" leads; the rest of the detail lives in the
+ * description, which has room for it.
+ */
+const title = `Time in ${city.name} — current local time and DST dates`;
 const description = profile.observesDst
   ? `The current time in ${city.name}, ${city.country}. ${city.name} is on UTC${formatOffset(profile.standardOffset)} in standard time and UTC${formatOffset(profile.dstOffset!)} on daylight saving, so its distance from other cities changes during the year. Includes the exact change dates.`
   : `The current time in ${city.name}, ${city.country}. ${city.name} stays on UTC${formatOffset(profile.standardOffset)} all year and never changes its clocks — but its distance from cities that do still moves. Includes the dates that happens.`;
@@ -138,9 +162,24 @@ const faqs = [
       })),
     })}
   />
+  <script
+    type="application/ld+json"
+    slot="head"
+    set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'World clock', item: `${seoOrigin}/` },
+        { '@type': 'ListItem', position: 2, name: 'Cities', item: `${seoOrigin}/time` },
+        { '@type': 'ListItem', position: 3, name: city.name },
+      ],
+    })}
+  />
 
   <nav aria-label="Breadcrumb" class="mb-5 text-xs text-paper-500">
     <a href="/" class="ring-focus hover:text-paper-900">World clock</a>
+    <span aria-hidden="true" class="mx-1.5">/</span>
+    <a href="/time" class="ring-focus hover:text-paper-900">Cities</a>
     <span aria-hidden="true" class="mx-1.5">/</span>
     <span aria-current="page">{city.name}</span>
   </nav>
@@ -189,11 +228,11 @@ const faqs = [
 
     {
       profile.transitions.length > 0 && (
-        <div class="mt-4 overflow-x-auto rounded-xl border border-paper-200 bg-white">
-          <table class="w-full text-sm">
+        <div class="mt-4 overflow-hidden overflow-x-auto rounded-xl border border-paper-200 bg-white elev">
+          <table class="data-table responsive-table transitions-table w-full text-sm">
             <caption class="sr-only">Upcoming clock changes in {city.name}</caption>
             <thead>
-              <tr class="border-b border-paper-100 text-left text-xs text-paper-500">
+              <tr class="border-b border-paper-200 text-left text-xs font-medium text-paper-700">
                 <th scope="col" class="px-3 py-2 font-medium">
                   Date
                 </th>
@@ -258,11 +297,13 @@ const faqs = [
       hedging &mdash; it is two governments moving their clocks on different weekends.
     </p>
 
-    <div class="mt-4 overflow-x-auto rounded-xl border border-paper-200 bg-white">
-      <table class="w-full text-sm">
+    <div
+      class="mt-4 overflow-hidden overflow-x-auto rounded-xl border border-paper-200 bg-white elev"
+    >
+      <table class="data-table responsive-table comparisons-table w-full text-sm">
         <caption class="sr-only">Time difference between {city.name} and other cities</caption>
         <thead>
-          <tr class="border-b border-paper-100 text-left text-xs text-paper-500">
+          <tr class="border-b border-paper-200 text-left text-xs font-medium text-paper-700">
             <th scope="col" class="px-3 py-2 font-medium">City</th>
             <th scope="col" class="px-3 py-2 font-medium">Difference now</th>
             <th scope="col" class="px-3 py-2 font-medium">Across the year</th>
@@ -309,13 +350,15 @@ const faqs = [
       clock leaves out: 17:00 is a bright evening in one month and long dark in another.
     </p>
 
-    <div class="mt-4 overflow-x-auto rounded-xl border border-paper-200 bg-white">
-      <table class="w-full text-sm">
+    <div
+      class="mt-4 overflow-hidden overflow-x-auto rounded-xl border border-paper-200 bg-white elev"
+    >
+      <table class="data-table responsive-table daylight-table w-full text-sm">
         <caption class="sr-only">
           Sunrise, sunset and daylight length in {city.name}, on the 21st of each month
         </caption>
         <thead>
-          <tr class="border-b border-paper-100 text-left text-xs text-paper-500">
+          <tr class="border-b border-paper-200 text-left text-xs font-medium text-paper-700">
             <th scope="col" class="px-3 py-2 font-medium">Month</th>
             <th scope="col" class="px-3 py-2 font-medium">Sunrise</th>
             <th scope="col" class="px-3 py-2 font-medium">Sunset</th>
@@ -360,13 +403,13 @@ const faqs = [
   <!-- ---------------------------------------------------------------- next -->
   <section class="mt-12 flex flex-wrap gap-2">
     <a
-      href={`/?p=${city.timeZone}-540-1020-12345`}
+      href={`/?${cityQuery}`}
       class="ring-focus rounded-lg bg-paper-900 px-4 py-2 text-sm font-medium text-paper-50 hover:opacity-90"
     >
       Add {city.name} to a world clock
     </a>
     <a
-      href={`/overlap?p=${city.timeZone}-540-1020-12345`}
+      href={`/overlap?${cityQuery}`}
       class="ring-focus rounded-lg border border-paper-200 bg-white px-4 py-2 text-sm font-medium text-paper-700 hover:border-paper-300"
     >
       Find a meeting time with {city.name}
@@ -374,17 +417,5 @@ const faqs = [
   </section>
 
   <!-- ----------------------------------------------------------------- faq -->
-  <section class="mt-14 max-w-2xl">
-    <h2 class="text-xl font-semibold tracking-tight">Questions</h2>
-    <dl class="mt-5 space-y-6">
-      {
-        faqs.map((f) => (
-          <div>
-            <dt class="text-sm font-medium">{f.q}</dt>
-            <dd class="mt-1.5 text-sm leading-relaxed text-paper-700">{f.a}</dd>
-          </div>
-        ))
-      }
-    </dl>
-  </section>
+  <Faq faqs={faqs} heading={`About time in ${city.name}`} />
 </Base>

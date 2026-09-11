@@ -1,4 +1,4 @@
-import { localMinutesOfDay, localWeekday } from './zone';
+import { localMinutesOfDay, localWeekday, zonedDateTimeToInstant, zonedParts } from './zone';
 
 /**
  * One person in the team, described entirely in their own local terms.
@@ -150,4 +150,81 @@ export function findFullOverlaps(
 /** Duration of a window in minutes. */
 export function windowMinutes(w: Window): number {
   return Math.round((w.end.getTime() - w.start.getTime()) / 60_000);
+}
+
+export interface MeetingCandidate {
+  at: Date;
+  baseMinutes: number;
+  availableIds: string[];
+  everyone: boolean;
+  /** False when this wall-clock time does not exist because clocks jump forward. */
+  valid: boolean;
+}
+
+/**
+ * Resolve a wall-clock start on a date, rejecting spring-forward times that do
+ * not exist. Repeated autumn times use the deterministic occurrence selected
+ * by `zonedDateTimeToInstant`; availability and export therefore share exactly
+ * the same instant.
+ */
+export function resolveMeetingStart(
+  isoDate: string,
+  timeZone: string,
+  minutesOfDay: number,
+): Date | null {
+  const instant = zonedDateTimeToInstant(isoDate, timeZone, minutesOfDay);
+  const actual = zonedParts(instant, timeZone);
+  const [year, month, day] = isoDate.split('-').map(Number);
+  return actual.year === year &&
+    actual.month === month &&
+    actual.day === day &&
+    actual.hour * 60 + actual.minute === minutesOfDay
+    ? instant
+    : null;
+}
+
+/** Availability for the full elapsed meeting, sampled at the planner's resolution. */
+export function isAvailableForMeeting(
+  participant: Participant,
+  meetingAt: Date,
+  durationMinutes: number,
+  stepMinutes = 30,
+): boolean {
+  for (let elapsed = 0; elapsed < durationMinutes; elapsed += stepMinutes) {
+    if (!isAvailable(participant, new Date(meetingAt.getTime() + elapsed * 60_000))) return false;
+  }
+  return true;
+}
+
+/**
+ * Build wall-clock candidates for one local day. Each candidate is resolved
+ * once and then reused for availability and selection, avoiding DST drift.
+ */
+export function meetingCandidates(
+  participants: Participant[],
+  isoDate: string,
+  anchorZone: string,
+  durationMinutes: number,
+  count = 48,
+  stepMinutes = 30,
+): MeetingCandidate[] {
+  return Array.from({ length: count }, (_, index) => {
+    const baseMinutes = index * stepMinutes;
+    const resolved = resolveMeetingStart(isoDate, anchorZone, baseMinutes);
+    const at = resolved ?? zonedDateTimeToInstant(isoDate, anchorZone, baseMinutes);
+    const availableIds = resolved
+      ? participants
+          .filter((participant) =>
+            isAvailableForMeeting(participant, resolved, durationMinutes, stepMinutes),
+          )
+          .map((participant) => participant.id)
+      : [];
+    return {
+      at,
+      baseMinutes,
+      availableIds,
+      everyone: availableIds.length === participants.length && participants.length > 0,
+      valid: resolved !== null,
+    };
+  });
 }

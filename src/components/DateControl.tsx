@@ -28,12 +28,12 @@ export default function DateControl({
   const live = date === null;
 
   return (
-    <div className="flex flex-wrap items-center gap-1.5">
+    <div className="date-control flex flex-wrap items-center gap-1.5">
       <button
         type="button"
         onClick={() => onChange(addDays(value, -1))}
         aria-label="Previous day"
-        className="ring-focus rounded-md border border-paper-200 px-2 py-1 text-xs text-paper-500 hover:text-paper-900"
+        className="ring-focus flex h-9 w-9 items-center justify-center rounded-lg border border-paper-200 bg-white text-sm text-paper-500 hover:border-paper-300 hover:text-paper-900"
       >
         &larr;
       </button>
@@ -48,7 +48,7 @@ export default function DateControl({
             // Clearing the field, or a half-typed year, should not blank the view.
             if (isValidIsoDate(next)) onChange(next === today ? null : next);
           }}
-          className="ring-focus nums rounded-md border border-paper-200 bg-white px-2 py-1 text-xs"
+          className="ring-focus nums h-9 min-w-[8.5rem] rounded-lg border border-paper-200 bg-white px-2.5 text-xs"
         />
       </label>
 
@@ -56,7 +56,7 @@ export default function DateControl({
         type="button"
         onClick={() => onChange(addDays(value, 1))}
         aria-label="Next day"
-        className="ring-focus rounded-md border border-paper-200 px-2 py-1 text-xs text-paper-500 hover:text-paper-900"
+        className="ring-focus flex h-9 w-9 items-center justify-center rounded-lg border border-paper-200 bg-white text-sm text-paper-500 hover:border-paper-300 hover:text-paper-900"
       >
         &rarr;
       </button>
@@ -65,13 +65,14 @@ export default function DateControl({
         <button
           type="button"
           onClick={() => onChange(null)}
-          className="ring-focus rounded-md bg-paper-900 px-2 py-1 text-xs font-medium text-paper-50"
+          className="ring-focus h-9 rounded-lg bg-paper-900 px-3 text-xs font-semibold text-paper-50"
         >
           Today
         </button>
       )}
 
-      <span className="text-xs text-paper-500">
+      <span className="inline-flex items-center gap-1.5 px-1 text-xs text-paper-500">
+        {live && <span className="h-1.5 w-1.5 rounded-full bg-go-500" aria-hidden="true" />}
         {live ? 'Live' : formatIsoDateLong(value).replace(/,/g, '')}
       </span>
     </div>

@@ -1,0 +1,66 @@
+---
+import Base from '../../layouts/Base.astro';
+import { CITIES } from '../../lib/time/cities';
+
+/*
+ * A directory page exists for one reason: without it, 43 of the 128 city pages
+ * had no internal inbound link at all and were reachable only through the
+ * sitemap. Crawl budget follows links, not sitemaps.
+ */
+const byCountry = new Map<string, typeof CITIES>();
+for (const city of [...CITIES].sort((a, b) => a.name.localeCompare(b.name))) {
+  const list = byCountry.get(city.country) ?? [];
+  list.push(city);
+  byCountry.set(city.country, list);
+}
+const countries = [...byCountry.entries()].sort(([a], [b]) => a.localeCompare(b));
+
+const title = `World Clock Cities — local time in ${CITIES.length} cities | Hours Apart`;
+const description = `Current local time, UTC offset, daylight saving dates and daylight hours for ${CITIES.length} cities in ${countries.length} countries. Pick a city to see whether the sun is up there right now.`;
+---
+
+<Base title={title} description={description} path="/time">
+  <nav aria-label="Breadcrumb" class="mb-5 text-xs text-paper-500">
+    <a href="/" class="ring-focus hover:text-paper-900">World clock</a>
+    <span aria-hidden="true" class="mx-1.5">/</span>
+    <span aria-current="page">Cities</span>
+  </nav>
+
+  <header class="mb-8 max-w-2xl">
+    <h1 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+      Time in {CITIES.length} cities
+    </h1>
+    <p class="mt-3 text-paper-700">
+      Every city page shows the current local time, whether it is light there, the exact daylight
+      saving change dates, and how far the city sits from sixteen major hubs across the year.
+    </p>
+    <p class="mt-3 text-sm leading-relaxed text-paper-500">
+      Looking for the gap between two specific cities? The
+      <a href="/difference" class="ring-focus rounded font-medium text-paper-900 underline"
+        >time difference directory</a
+      > lists every pair, including the ones whose gap changes during the year.
+    </p>
+  </header>
+
+  <div class="space-y-8">
+    {
+      countries.map(([country, cities]) => (
+        <section>
+          <h2 class="text-sm font-semibold tracking-wide text-paper-900 uppercase">{country}</h2>
+          <ul class="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            {cities.map((city) => (
+              <li>
+                <a
+                  href={`/time/${city.slug}`}
+                  class="ring-focus rounded text-paper-700 hover:text-paper-900"
+                >
+                  Time in {city.name}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))
+    }
+  </div>
+</Base>

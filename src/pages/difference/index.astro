@@ -1,0 +1,63 @@
+---
+import Base from '../../layouts/Base.astro';
+import { hubPairs } from '../../lib/time/cities';
+
+/*
+ * Companion to /time. 136 of the 526 pair pages had no internal inbound link
+ * before this existed. Grouped by the first city so the list is scannable
+ * rather than 526 undifferentiated links.
+ */
+const pairs = hubPairs();
+
+const grouped = new Map<string, Array<{ href: string; label: string }>>();
+for (const [a, b] of pairs) {
+  const list = grouped.get(a.name) ?? [];
+  list.push({ href: `/difference/${a.slug}/${b.slug}`, label: b.name });
+  grouped.set(a.name, list);
+}
+const groups = [...grouped.entries()].sort(([a], [b]) => a.localeCompare(b));
+
+const title = `Time Difference Directory — every city pair | Hours Apart`;
+const description = `The time difference between ${groups.length} major cities, ${pairs.length} pairs in total. Each page lists every gap across the year with exact dates, because most pairs are not a fixed number of hours apart.`;
+---
+
+<Base title={title} description={description} path="/difference">
+  <nav aria-label="Breadcrumb" class="mb-5 text-xs text-paper-500">
+    <a href="/" class="ring-focus hover:text-paper-900">World clock</a>
+    <span aria-hidden="true" class="mx-1.5">/</span>
+    <span aria-current="page">Time differences</span>
+  </nav>
+
+  <header class="mb-8 max-w-2xl">
+    <h1 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">Time differences</h1>
+    <p class="mt-3 text-paper-700">
+      {pairs.length} city pairs. Each page gives the gap right now, every other gap the pair takes during
+      the year, and the exact dates it changes &mdash; which is the part a plain converter leaves out.
+    </p>
+    <p class="mt-3 text-sm leading-relaxed text-paper-500">
+      Want one city on its own? See the
+      <a href="/time" class="ring-focus rounded font-medium text-paper-900 underline"
+        >city directory</a
+      >.
+    </p>
+  </header>
+
+  <div class="space-y-8">
+    {
+      groups.map(([city, list]) => (
+        <section>
+          <h2 class="text-sm font-semibold tracking-wide text-paper-900 uppercase">{city} to</h2>
+          <ul class="mt-3 grid gap-x-6 gap-y-2 text-sm sm:grid-cols-2 lg:grid-cols-3">
+            {list.map((pair) => (
+              <li>
+                <a href={pair.href} class="ring-focus rounded text-paper-700 hover:text-paper-900">
+                  {city} to {pair.label}
+                </a>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ))
+    }
+  </div>
+</Base>

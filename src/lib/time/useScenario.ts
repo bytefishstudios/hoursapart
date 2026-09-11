@@ -5,7 +5,12 @@ import {
   DEFAULT_WORK_START,
   type Participant,
 } from './overlap';
-import { decodeScenario, encodeScenario } from './share';
+import {
+  DEFAULT_MEETING_DURATION,
+  decodeScenario,
+  encodeScenario,
+  type MeetingDuration,
+} from './share';
 import { labelForTimeZone } from './cities';
 import { localTimeZone } from './zone';
 
@@ -45,11 +50,64 @@ function seed(): Participant[] {
   return zones.map((z) => makeParticipant(z));
 }
 
+interface ScenarioCore {
+  participants: Participant[];
+  /** Identity, not array position: reordering must never silently change the base. */
+  anchorId: string;
+}
+
+/**
+ * Reorder one visible city while leaving the hidden base in its original slot.
+ * Reorder targets use visible-list indexes, so the base must never consume one.
+ */
+export function reorderParticipant(
+  participants: Participant[],
+  id: string,
+  targetVisibleIndex: number,
+  anchorId: string,
+): Participant[] {
+  if (id === anchorId) return participants;
+
+  const visible = participants.filter((participant) => participant.id !== anchorId);
+  const currentVisibleIndex = visible.findIndex((participant) => participant.id === id);
+  if (currentVisibleIndex < 0 || visible.length < 2) return participants;
+
+  const target = Math.max(0, Math.min(visible.length - 1, targetVisibleIndex));
+  if (target === currentVisibleIndex) return participants;
+
+  const reordered = [...visible];
+  const [moved] = reordered.splice(currentVisibleIndex, 1);
+  reordered.splice(target, 0, moved);
+
+  let visibleIndex = 0;
+  return participants.map((participant) =>
+    participant.id === anchorId ? participant : reordered[visibleIndex++],
+  );
+}
+
+/** Remove one entry while preserving the base, or choosing an adjacent replacement. */
+export function removeParticipant(
+  participants: Participant[],
+  id: string,
+  anchorId: string,
+): ScenarioCore {
+  if (participants.length <= 1) return { participants, anchorId };
+  const index = participants.findIndex((participant) => participant.id === id);
+  if (index < 0) return { participants, anchorId };
+
+  const next = participants.filter((participant) => participant.id !== id);
+  return {
+    participants: next,
+    anchorId: id === anchorId ? next[Math.min(index, next.length - 1)].id : anchorId,
+  };
+}
+
 export interface ScenarioState {
   participants: Participant[];
   anchorIndex: number;
   anchor: Participant;
   meetingMinutes: number | null;
+  durationMinutes: MeetingDuration;
   /** Calendar day in the anchor's zone, or `null` for "today, live". */
   date: string | null;
   /** Current scenario as a query string, for cross-view links and sharing. */
@@ -59,36 +117,54 @@ export interface ScenarioState {
   add: (timeZone: string, label?: string) => void;
   remove: (id: string) => void;
   update: (id: string, patch: Partial<Participant>) => void;
-  move: (id: string, direction: -1 | 1) => void;
+  reorder: (id: string, targetVisibleIndex: number) => void;
   setAnchor: (index: number) => void;
   setMeetingMinutes: (minutes: number | null) => void;
+  setDurationMinutes: (minutes: MeetingDuration) => void;
   setDate: (date: string | null) => void;
 }
 
 export function useScenario(): ScenarioState {
-  const [participants, setParticipants] = useState<Participant[]>(seed);
-  const [anchorIndex, setAnchorIndex] = useState(0);
+  const [core, setCore] = useState<ScenarioCore>(() => {
+    const participants = seed();
+    return { participants, anchorId: participants[0].id };
+  });
   const [meetingMinutes, setMeetingMinutes] = useState<number | null>(null);
+  const [durationMinutes, setDurationMinutes] = useState<MeetingDuration>(DEFAULT_MEETING_DURATION);
   const [date, setDate] = useState<string | null>(null);
   const [hydrated, setHydrated] = useState(false);
+
+  const { participants, anchorId } = core;
 
   // Read the URL once on mount. Server-rendered markup uses the seed, so this
   // is also where a shared link takes over.
   useEffect(() => {
     const shared = decodeScenario(window.location.search);
     if (shared) {
-      setParticipants(shared.participants);
-      setAnchorIndex(shared.anchorIndex);
+      setCore({
+        participants: shared.participants,
+        anchorId: shared.participants[shared.anchorIndex].id,
+      });
       setMeetingMinutes(shared.meetingMinutes);
+      setDurationMinutes(shared.durationMinutes);
       setDate(shared.date);
     }
     setHydrated(true);
   }, []);
 
-  const safeAnchorIndex = Math.min(anchorIndex, Math.max(0, participants.length - 1));
+  const matchedAnchorIndex = participants.findIndex((participant) => participant.id === anchorId);
+  const anchorIndex = matchedAnchorIndex >= 0 ? matchedAnchorIndex : 0;
+  const anchor = participants[anchorIndex];
   const query = useMemo(
-    () => encodeScenario({ participants, anchorIndex: safeAnchorIndex, meetingMinutes, date }),
-    [participants, safeAnchorIndex, meetingMinutes, date],
+    () =>
+      encodeScenario({
+        participants,
+        anchorIndex,
+        meetingMinutes,
+        durationMinutes,
+        date,
+      }),
+    [participants, anchorIndex, meetingMinutes, durationMinutes, date],
   );
 
   // Mirror state into the address bar so a reload, a bookmark or a copied URL
@@ -102,44 +178,63 @@ export function useScenario(): ScenarioState {
   }, [query, hydrated]);
 
   const add = useCallback((timeZone: string, label?: string) => {
-    setParticipants((prev) =>
-      prev.length >= 12 ? prev : [...prev, makeParticipant(timeZone, label)],
-    );
+    setCore((previous) => ({
+      ...previous,
+      participants:
+        previous.participants.length >= 12
+          ? previous.participants
+          : [...previous.participants, makeParticipant(timeZone, label)],
+    }));
   }, []);
 
   const remove = useCallback((id: string) => {
-    setParticipants((prev) => (prev.length === 1 ? prev : prev.filter((p) => p.id !== id)));
+    setCore((previous) => removeParticipant(previous.participants, id, previous.anchorId));
   }, []);
 
   const update = useCallback((id: string, patch: Partial<Participant>) => {
-    setParticipants((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+    setCore((previous) => ({
+      ...previous,
+      participants: previous.participants.map((participant) =>
+        participant.id === id ? { ...participant, ...patch } : participant,
+      ),
+    }));
   }, []);
 
-  const move = useCallback((id: string, direction: -1 | 1) => {
-    setParticipants((prev) => {
-      const index = prev.findIndex((p) => p.id === id);
-      const target = index + direction;
-      if (index < 0 || target < 0 || target >= prev.length) return prev;
-      const next = [...prev];
-      [next[index], next[target]] = [next[target], next[index]];
-      return next;
+  const reorder = useCallback((id: string, targetVisibleIndex: number) => {
+    setCore((previous) => ({
+      ...previous,
+      participants: reorderParticipant(
+        previous.participants,
+        id,
+        targetVisibleIndex,
+        previous.anchorId,
+      ),
+    }));
+  }, []);
+
+  const setAnchor = useCallback((index: number) => {
+    setCore((previous) => {
+      const selected = previous.participants[index];
+      return selected ? { ...previous, anchorId: selected.id } : previous;
     });
   }, []);
 
   return {
     participants,
-    anchorIndex: safeAnchorIndex,
-    anchor: participants[safeAnchorIndex] ?? participants[0],
+    anchorIndex,
+    anchor,
     meetingMinutes,
+    durationMinutes,
     date,
     query,
     hydrated,
     add,
     remove,
     update,
-    move,
-    setAnchor: setAnchorIndex,
+    reorder,
+    setAnchor,
     setMeetingMinutes,
+    setDurationMinutes,
     setDate,
   };
 }

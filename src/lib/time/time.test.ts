@@ -15,6 +15,8 @@ import {
   DEFAULT_WORK_DAYS,
   findFullOverlaps,
   isAvailable,
+  meetingCandidates,
+  resolveMeetingStart,
   windowMinutes,
   type Participant,
 } from './overlap';
@@ -174,6 +176,36 @@ describe('resolveLocalTime', () => {
     const [spring] = findTransitions('Europe/London', new Date('2026-01-01T00:00:00Z'), 12);
     const at = resolveLocalTime(spring.at, 'Europe/London', 14 * 60);
     expect(localMinutesOfDay(at, 'Europe/London')).toBe(14 * 60);
+  });
+});
+
+describe('meeting candidates on DST days', () => {
+  it('rejects nonexistent spring-forward starts and keeps later starts aligned', () => {
+    expect(resolveMeetingStart('2026-03-29', 'Europe/London', 90)).toBeNull();
+
+    const london = person({
+      id: 'london',
+      timeZone: 'Europe/London',
+      workStart: 0,
+      workEnd: 180,
+      workDays: [0],
+    });
+    const candidates = meetingCandidates([london], '2026-03-29', 'Europe/London', 120);
+    expect(candidates[2].valid).toBe(false); // 01:00 does not occur.
+    expect(candidates[3].valid).toBe(false); // 01:30 does not occur.
+    expect(candidates[4].valid).toBe(true);
+    expect(localMinutesOfDay(candidates[4].at, 'Europe/London')).toBe(120);
+    // 00:30 + two elapsed hours reaches 03:30 after the jump, so a shift
+    // ending at 03:00 cannot fit the whole meeting.
+    expect(candidates[1].availableIds).toEqual([]);
+  });
+
+  it('uses one deterministic autumn occurrence for both grid and export', () => {
+    const resolved = resolveMeetingStart('2026-10-25', 'Europe/London', 90);
+    expect(resolved).not.toBeNull();
+    const repeatedHour = meetingCandidates([], '2026-10-25', 'Europe/London', 60)[3];
+    expect(repeatedHour.valid).toBe(true);
+    expect(repeatedHour.at.toISOString()).toBe(resolved!.toISOString());
   });
 });
 

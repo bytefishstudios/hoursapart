@@ -1,0 +1,3604 @@
+diff --git a/.kiro/steering/hoursapart-context.md b/.kiro/steering/hoursapart-context.md
+index e9b1562..5bc3836 100644
+--- a/.kiro/steering/hoursapart-context.md
++++ b/.kiro/steering/hoursapart-context.md
+@@ -48,10 +48,12 @@ the browser/Node `Intl` API.
+ 
+ ```
+ cd /Users/alan.lyu1/Workspace/hoursapart
+-npm run dev                 # http://localhost:4321
+-npm run build               # static output to dist/ (currently 640 pages)
+-npm test                    # vitest run (93 tests)
+-npx tsc --noEmit            # typecheck
++npm run dev                 # http://localhost:4321 (forces NODE_ENV=development)
++npm run build               # static output to dist/ (643 pages)
++npm test                    # vitest run (100 tests)
++npm run typecheck           # tsc --noEmit
++npm run smoke:browser       # real Chrome hydration + responsive overflow check
++npm run format:check        # Prettier verification
+ ```
+ 
+ Notes:
+@@ -68,9 +70,10 @@ Notes:
+   deliberate: pages are useful before JS loads, precise after.
+ - **URL is the state.** No accounts, no DB. The scenario lives in the query string, which
+   is also the share mechanism. Format:
+-  `?p=<zone>-<workStart>-<workEnd>-<workDays>[-<label>]_<next person>...&a=<anchorIndex>&m=<meetingMinutes>&d=<YYYY-MM-DD>`
+-  Minutes are since local midnight; `d` is omitted when live/today; decode is tolerant of
+-  mangled links and backward-compatible with date-less (pre-date) links.
++  `?p=<zone>-<workStart>-<workEnd>-<workDays>[-<label>]_<next person>...&a=<anchorIndex>&m=<meetingMinutes>&l=<durationMinutes>&d=<YYYY-MM-DD>`
++  Minutes are since local midnight; duration `l` supports 30/60/90/120 and is omitted at
++  the 30-minute default. `d` is omitted when live/today; decode is tolerant of mangled
++  links and backward-compatible with links made before dates or durations existed.
+ 
+ ### Files
+ 
+@@ -104,8 +107,10 @@ Engine — `src/lib/time/`:
+ - `difference.ts` — the pair-page engine. `offsetSpans` (day-by-day scan at local noon in
+   zone A), `describeDifference` (spans + distinctGaps + `varies` + `shortestSpan`),
+   `gapOnDate`, `convertTime` (returns `{minutes, dayShift}`), `dstProfile`, `formatGap`.
+-- `share.ts` — `encodeScenario`/`decodeScenario`. `useScenario.ts` — the shared React
+-  state hook (seeds viewer zone + London + New York + Tokyo).
++- `share.ts` — `encodeScenario`/`decodeScenario`, including backward-compatible meeting
++  duration state. `calendar.ts` — portable UTC `.ics`, Google Calendar and Outlook export
++  helpers. `useScenario.ts` — the shared React state hook (seeds viewer zone + London + New
++  York + Tokyo).
+ 
+ Components — `src/components/`:
+ 
+@@ -116,7 +121,8 @@ Components — `src/components/`:
+ Pages — `src/pages/`: `index.astro`, `overlap.astro`, `time/[city].astro`
+ (getStaticPaths over all cities), `difference/[a]/[b].astro` (getStaticPaths over
+ `hubPairs()`, alphabetical slug order so each pair has ONE canonical URL),
+-`404.astro` (noindex), `privacy.astro`. Layout: `layouts/Base.astro` — carries the
++`404.astro` (noindex), `privacy.astro`, `contact.astro` (browser-built mailto feedback;
++no form backend). Layout: `layouts/Base.astro` — carries the
+ "Hours Apart" wordmark banner, footer nav, and all OG / icon / theme-color meta. Styles:
+ `styles/global.css`.
+ 
+@@ -148,6 +154,12 @@ stored preference always wins.
+ - Pair-page span scan anchors to the FIRST OF THE MONTH, not "today", so static rows keep
+   real dates on both ends between deploys.
+ - Palette deliberately warm "paper", not slate/indigo (that is the AI-default look).
++- Meeting duration is restricted to 30/60/90/120 minutes because the planner evaluates a
++  30-minute grid. A start is recommended only when every attendee remains available for the
++  entire interval; end instants are elapsed UTC time so DST transitions stay correct.
++- Calendar export uses UTC `DTSTART`/exclusive `DTEND` for portable `.ics` files, plus
++  encoded Google/Outlook links. Feedback uses a local `mailto:` draft to
++  `hello@hoursapart.app`, preserving the static/no-form-provider architecture.
+ - Deploy target = Cloudflare Pages (build `npm run build`, output `dist`, Node from
+   `.nvmrc`). Apex `hoursapart.app` is canonical; `www` 301s to it via `public/_redirects`.
+ - Formatting = Prettier (+ prettier-plugin-astro), enforced in CI via `format:check`.
+@@ -159,10 +171,23 @@ stored preference always wins.
+ 
+ ## Current status (update me)
+ 
+-- 642 pages build clean: home, `/overlap`, `/privacy`, `/404`, 112 `/time/[city]`,
+-  526 `/difference/[a]/[b]`. Sitemap generated. (Was 640 before `/privacy` + `/404`.)
+-- 93 tests pass across 4 files (time, share, solar, difference). tsc clean. Re-verified on
+-  Node 22.18 after the launch-prep changes below.
++- 643 pages build clean: home, `/overlap`, `/privacy`, `/contact`, `/404`, 112
++  `/time/[city]`, 526 `/difference/[a]/[b]`. Sitemap generated.
++- 100 tests pass across 5 files (time, share, solar, difference, calendar). tsc and
++  Prettier clean. Re-verified after duration, calendar-export, and feedback work.
++- Meeting planner now supports 30/60/90/120-minute meetings in share URLs and validates
++  every candidate across the full interval. Selected meetings export to `.ics`, Google
++  Calendar, and Outlook with participant-local summaries and exact UTC endpoints.
++- Static `/contact` builds a prefilled email draft for `hello@hoursapart.app`; no content
++  is posted by the site. Footer and privacy disclosure are updated.
++- Production UI redesign complete: responsive product shell; tool-first homepage; high-contrast
++  world-clock console; mobile-specific meeting recommendations; daylight-led city hero; unified
++  pair converter; and labelled mobile table cards. Real-Chrome smoke checks cover `/`, a
++  duration-selected `/overlap`, `/time/london`, `/difference/london/sydney`, and `/contact`
++  at 1440×1000 and 390×844. All 10 checks render expected content, throw zero runtime
++  exceptions, and have zero page-level overflow; React routes also prove hydration.
++- `npm run dev` forces `NODE_ENV=development` to prevent Vite from caching React's production
++  `jsx-dev-runtime` during development. `npm run smoke:browser` guards against empty islands.
+ - Launch prep done in code: visible wordmark; `robots.txt`; OG image (`og.png`) + app icons
+   - manifest + theme-color; security headers + www→apex redirect; privacy page; Prettier +
+     CI + README. Dead `overlap.ts` exports removed. Remaining items are in `LAUNCH-CHECKLIST.md`.
+@@ -181,6 +206,8 @@ left needs your accounts or manual testing:
+   commit. Pushing needs a remote you create — no remote/push has been done.
+ - **Cloudflare Pages.** Create the project + connect the repo, add the custom domain
+   `hoursapart.app` and its DNS. Build `npm run build`, output `dist`, Node from `.nvmrc`.
++- **Contact email.** Configure forwarding or a mailbox for `hello@hoursapart.app` before
++  launch, then send a real message through `/contact` and confirm delivery.
+ - **Share / SEO ops.** Enable Cloudflare Web Analytics (dashboard, cookieless), register
+   Google + Bing Search Console and submit the sitemap.
+ - **OG artwork.** `og.png` is generated from `og.svg`; swap in a designed image later if
+diff --git a/LAUNCH-CHECKLIST.md b/LAUNCH-CHECKLIST.md
+index 9b4c245..0c2fa12 100644
+--- a/LAUNCH-CHECKLIST.md
++++ b/LAUNCH-CHECKLIST.md
+@@ -7,7 +7,7 @@ Legend: `[x]` done · `[ ]` todo · **(Blocker)** must ship before public launch
+ **(Recommended)** soon · **(Nice-to-have)** when there is time · _(you)_ needs your
+ account/DNS · _(QA)_ manual testing.
+ 
+-Last updated: 2026-09-01. Build is green: 642 pages, 93 tests, tsc clean.
++Last updated: 2026-09-01. Build is green: 643 pages, 100 tests, tsc and Prettier clean.
+ 
+ ## 1. Quality gates
+ 
+@@ -68,13 +68,16 @@ Last updated: 2026-09-01. Build is green: 642 pages, 93 tests, tsc clean.
+ ## 9. Cross-browser / device QA
+ 
+ - [ ] (Recommended) _(QA)_ Chrome / Firefox / Safari + iOS Safari (date input) + Android
+-- [ ] (Recommended) _(QA)_ Mobile layout of the TeamPlanner grid
++- [ ] (Recommended) _(QA)_ Mobile layout of the TeamPlanner recommendations and duration controls
++- [ ] (Recommended) _(QA)_ Download `.ics` and open it in Apple/Google/Outlook Calendar
+ - [ ] (Recommended) _(QA)_ DST edge cases against real upcoming transition dates (the headline feature)
+ 
+ ## 10. Content, legal, trust
+ 
+ - [x] **(Blocker)** Custom 404 page
+ - [x] (Recommended) Privacy page (`/privacy`, linked in the footer) — stores nothing but `localStorage['sky-mode']`
++- [x] (Recommended) Contact/feedback page (`/contact`) creates a local email draft; no form provider or backend
++- [ ] **(Blocker)** _(you)_ Configure `hello@hoursapart.app` forwarding/mailbox and verify a real `/contact` message arrives
+ - [x] (Recommended) Copy proofread; FAQ content reviewed
+ 
+ ## 11. Launch ops
+diff --git a/package-lock.json b/package-lock.json
+index 4cc9f74..5ff2a09 100644
+--- a/package-lock.json
++++ b/package-lock.json
+@@ -10,6 +10,7 @@
+       "dependencies": {
+         "@astrojs/react": "6.0.4",
+         "@astrojs/sitemap": "3.7.3",
++        "@fontsource-variable/inter": "5.3.0",
+         "astro": "7.2.9",
+         "react": "19.2.8",
+         "react-dom": "19.2.8"
+@@ -1200,6 +1201,15 @@
+         "node": ">=18"
+       }
+     },
++    "node_modules/@fontsource-variable/inter": {
++      "version": "5.3.0",
++      "resolved": "https://registry.npmjs.org/@fontsource-variable/inter/-/inter-5.3.0.tgz",
++      "integrity": "sha512-OupL48va4JNofb97w6NYeF9S7W/kHNKM0Er8Dem5nqi4jeOLrVJDoE8tZEpnMJmtkvNbB1EIPPwHcdkF6b1oUA==",
++      "license": "OFL-1.1",
++      "funding": {
++        "url": "https://github.com/sponsors/ayuhito"
++      }
++    },
+     "node_modules/@img/colour": {
+       "version": "1.1.0",
+       "resolved": "https://registry.npmjs.org/@img/colour/-/colour-1.1.0.tgz",
+diff --git a/package.json b/package.json
+index 504e8ed..4e2091b 100644
+--- a/package.json
++++ b/package.json
+@@ -5,11 +5,12 @@
+   "type": "module",
+   "description": "Hours Apart — a world clock, time-zone difference lookup and meeting planner that shows whether it is light there and warns you before daylight saving shifts the time.",
+   "scripts": {
+-    "dev": "astro dev",
++    "dev": "NODE_ENV=development astro dev",
+     "build": "astro build",
+     "preview": "astro preview",
+     "test": "vitest run",
+     "test:watch": "vitest",
++    "smoke:browser": "node scripts/browser-smoke.mjs",
+     "typecheck": "tsc --noEmit",
+     "format": "prettier --write .",
+     "format:check": "prettier --check .",
+@@ -18,6 +19,7 @@
+   "dependencies": {
+     "@astrojs/react": "6.0.4",
+     "@astrojs/sitemap": "3.7.3",
++    "@fontsource-variable/inter": "5.3.0",
+     "astro": "7.2.9",
+     "react": "19.2.8",
+     "react-dom": "19.2.8"
+diff --git a/src/components/CityClock.tsx b/src/components/CityClock.tsx
+index c5b6a0b..7d3b7e0 100644
+--- a/src/components/CityClock.tsx
++++ b/src/components/CityClock.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useState } from 'react';
++import { useEffect, useState, type CSSProperties } from 'react';
+ import { skyState, sunTimes, type SkyState } from '../lib/time/solar';
+ import {
+   formatMinutes,
+@@ -11,13 +11,8 @@ import {
+ import { formatGap } from '../lib/time/difference';
+ 
+ /**
+- * The live part of a city page.
+- *
+- * Everything else on these pages is generated at build time, because daylight
+- * saving dates and offsets do not change between builds. The current time
+- * obviously does, so it is the one piece that has to run in the browser. Keeping
+- * the split at exactly this line means the page is useful before any JavaScript
+- * loads and precise once it does.
++ * The live part of a city page. Static DST and daylight tables remain useful
++ * without JavaScript; this card becomes exact once the browser clock is known.
+  */
+ export default function CityClock({
+   name,
+@@ -30,8 +25,6 @@ export default function CityClock({
+ }) {
+   const [now, setNow] = useState<Date | null>(null);
+ 
+-  // Rendered null on the server and on the first client paint, so the markup
+-  // never claims a time that is already wrong by the time it is read.
+   useEffect(() => {
+     setNow(new Date());
+     const id = window.setInterval(() => setNow(new Date()), 1000);
+@@ -40,8 +33,8 @@ export default function CityClock({
+ 
+   if (now === null) {
+     return (
+-      <div className="rounded-2xl border border-paper-200 bg-white p-5">
+-        <p className="text-sm text-paper-500">Reading your clock&hellip;</p>
++      <div className="min-h-60 animate-pulse rounded-[1.75rem] border border-paper-200 bg-white elev">
++        <p className="p-6 text-sm text-paper-500">Reading your clock&hellip;</p>
+       </div>
+     );
+   }
+@@ -51,22 +44,28 @@ export default function CityClock({
+   const sky = skyState(now, timeZone, latitude);
+   const sun = sunTimes(isoDate, latitude);
+   const offset = offsetMinutes(now, timeZone);
+-
+   const viewerZone = localTimeZone();
+   const relative = offset - offsetMinutes(now, viewerZone);
+   const sameZone = viewerZone === timeZone;
++  const strip = daylightGradient(sun.sunrise, sun.sunset, sun.polar);
+ 
+   return (
+-    <div className="rounded-2xl border border-paper-200 bg-white p-5">
+-      <div className="flex flex-wrap items-start justify-between gap-4">
++    <section
++      className={`city-live-card city-live-${sky.state} relative overflow-hidden rounded-[1.75rem] border border-paper-200 bg-white p-5 elev-lift sm:p-7`}
++      aria-label={`Live time and daylight in ${name}`}
++    >
++      <div className="relative z-10 grid items-end gap-7 sm:grid-cols-[minmax(0,1.25fr)_minmax(18rem,0.75fr)]">
+         <div>
+-          <p className="text-xs font-medium tracking-wide text-paper-500 uppercase">
+-            Current time in {name}
+-          </p>
+-          <p className="nums mt-1 text-4xl font-semibold tracking-tight tabular-nums sm:text-5xl">
++          <div className="flex flex-wrap items-center gap-2">
++            <p className="text-[11px] font-semibold tracking-[0.16em] text-paper-500 uppercase">
++              Current time in {name}
++            </p>
++            <SkyBadge state={sky.state} />
++          </div>
++          <p className="nums mt-3 text-6xl leading-none font-semibold tracking-[-0.05em] tabular-nums sm:text-7xl">
+             {formatMinutes(minutes)}
+           </p>
+-          <p className="mt-1 text-sm text-paper-700">
++          <p className="mt-3 text-base font-medium text-paper-700">
+             {new Intl.DateTimeFormat('en', {
+               timeZone,
+               weekday: 'long',
+@@ -75,44 +74,112 @@ export default function CityClock({
+               year: 'numeric',
+             }).format(now)}
+           </p>
+-          <p className="nums mt-0.5 text-xs text-paper-500">
++          <p className="nums mt-1 text-xs text-paper-500">
+             UTC{formatOffset(offset)}
+-            {!sameZone && <> &middot; {formatGap(relative)} than you</>}
++            {!sameZone && <> &middot; {formatGap(relative)} you</>}
+             {sameZone && <> &middot; your own time zone</>}
+           </p>
+         </div>
+ 
+-        <div className="flex items-center gap-3">
+-          <SkyBadge state={sky.state} />
+-          <div className="nums text-xs text-paper-500">
+-            {sun.polar === true && <p className="font-medium text-paper-700">Sun does not set</p>}
+-            {sun.polar === false && <p className="font-medium text-paper-700">Sun does not rise</p>}
+-            {sun.sunrise !== null && <p>Sunrise {formatMinutes(sun.sunrise)}</p>}
+-            {sun.sunset !== null && <p>Sunset {formatMinutes(sun.sunset)}</p>}
+-            <p className="opacity-70">
+-              {Math.floor(sun.daylightMinutes / 60)}h {sun.daylightMinutes % 60}m of daylight
+-            </p>
+-          </div>
++        <dl className="grid grid-cols-3 overflow-hidden rounded-2xl border border-paper-200 bg-paper-50/75">
++          <SunStat
++            label="Sunrise"
++            value={
++              sun.sunrise === null
++                ? sun.polar
++                  ? 'No sunset'
++                  : 'No sunrise'
++                : formatMinutes(sun.sunrise)
++            }
++          />
++          <SunStat
++            label="Sunset"
++            value={
++              sun.sunset === null
++                ? sun.polar
++                  ? 'No sunset'
++                  : 'No sunrise'
++                : formatMinutes(sun.sunset)
++            }
++          />
++          <SunStat
++            label="Daylight"
++            value={`${Math.floor(sun.daylightMinutes / 60)}h ${sun.daylightMinutes % 60}m`}
++          />
++        </dl>
++      </div>
++
++      <div className="relative z-10 mt-7">
++        <div
++          className="sky-strip relative h-4 overflow-hidden rounded-full border border-paper-900/10"
++          style={{ '--sky-stops': strip } as CSSProperties}
++          role="img"
++          aria-label={`${name}'s daylight across today; marker at ${formatMinutes(minutes)}`}
++        >
++          <span
++            className="sky-marker absolute top-0 h-full w-0.5 bg-paper-900"
++            style={{ left: `calc(${(minutes / 1440) * 100}% - 1px)` }}
++            aria-hidden="true"
++          />
++        </div>
++        <div
++          className="nums mt-1.5 flex justify-between text-[10px] text-paper-500"
++          aria-hidden="true"
++        >
++          <span>00:00</span>
++          <span>06:00</span>
++          <span>12:00</span>
++          <span>18:00</span>
++          <span>00:00</span>
+         </div>
+       </div>
+-    </div>
++    </section>
+   );
+ }
+ 
+ function SkyBadge({ state }: { state: SkyState }) {
+-  const label = state === 'day' ? 'Daylight' : state === 'twilight' ? 'Twilight' : 'Dark';
++  const label =
++    state === 'day' ? 'Daylight now' : state === 'twilight' ? 'Twilight now' : 'Dark now';
++  const dot =
++    state === 'day' ? 'bg-sky-day' : state === 'twilight' ? 'bg-sky-dusk' : 'bg-sky-night';
+   return (
+-    <span
+-      role="img"
+-      aria-label={`Currently ${label.toLowerCase()}`}
+-      title={label}
+-      className={`h-9 w-9 shrink-0 rounded-full border ${
+-        state === 'day'
+-          ? 'border-sky-day bg-sky-day'
+-          : state === 'twilight'
+-            ? 'border-sky-dusk bg-sky-dusk'
+-            : 'border-paper-300 bg-sky-night'
+-      }`}
+-    />
++    <span className="inline-flex items-center gap-1.5 rounded-full border border-paper-200 bg-white/80 px-2 py-1 text-[10px] font-semibold text-paper-700">
++      <span className={`h-2 w-2 rounded-full ${dot}`} aria-hidden="true" />
++      {label}
++    </span>
+   );
+ }
++
++function SunStat({ label, value }: { label: string; value: string }) {
++  return (
++    <div className="border-r border-paper-200 px-2 py-3 text-center last:border-r-0 sm:px-3 sm:py-4">
++      <dt className="text-[9px] font-semibold tracking-wide text-paper-500 uppercase">{label}</dt>
++      <dd className="nums mt-1 text-xs font-semibold sm:text-sm">{value}</dd>
++    </div>
++  );
++}
++
++function daylightGradient(
++  sunrise: number | null,
++  sunset: number | null,
++  polar: boolean | null,
++): string {
++  if (sunrise === null || sunset === null) {
++    return polar
++      ? 'var(--color-sky-day) 0%, var(--color-sky-day) 100%'
++      : 'var(--color-sky-night) 0%, var(--color-sky-night) 100%';
++  }
++
++  const at = (value: number) =>
++    `${((Math.max(0, Math.min(1440, value)) / 1440) * 100).toFixed(2)}%`;
++  return [
++    `var(--color-sky-night) 0%`,
++    `var(--color-sky-night) ${at(sunrise - 45)}`,
++    `var(--color-sky-dusk) ${at(sunrise)}`,
++    `var(--color-sky-day) ${at(sunrise + 35)}`,
++    `var(--color-sky-day) ${at(sunset - 35)}`,
++    `var(--color-sky-dusk) ${at(sunset)}`,
++    `var(--color-sky-night) ${at(sunset + 45)}`,
++    `var(--color-sky-night) 100%`,
++  ].join(', ');
++}
+diff --git a/src/components/DateControl.tsx b/src/components/DateControl.tsx
+index d792045..67942d9 100644
+--- a/src/components/DateControl.tsx
++++ b/src/components/DateControl.tsx
+@@ -28,12 +28,12 @@ export default function DateControl({
+   const live = date === null;
+ 
+   return (
+-    <div className="flex flex-wrap items-center gap-1.5">
++    <div className="date-control flex flex-wrap items-center gap-1.5">
+       <button
+         type="button"
+         onClick={() => onChange(addDays(value, -1))}
+         aria-label="Previous day"
+-        className="ring-focus rounded-md border border-paper-200 px-2 py-1 text-xs text-paper-500 hover:text-paper-900"
++        className="ring-focus flex h-9 w-9 items-center justify-center rounded-lg border border-paper-200 bg-white text-sm text-paper-500 hover:border-paper-300 hover:text-paper-900"
+       >
+         &larr;
+       </button>
+@@ -48,7 +48,7 @@ export default function DateControl({
+             // Clearing the field, or a half-typed year, should not blank the view.
+             if (isValidIsoDate(next)) onChange(next === today ? null : next);
+           }}
+-          className="ring-focus nums rounded-md border border-paper-200 bg-white px-2 py-1 text-xs"
++          className="ring-focus nums h-9 min-w-[8.5rem] rounded-lg border border-paper-200 bg-white px-2.5 text-xs"
+         />
+       </label>
+ 
+@@ -56,7 +56,7 @@ export default function DateControl({
+         type="button"
+         onClick={() => onChange(addDays(value, 1))}
+         aria-label="Next day"
+-        className="ring-focus rounded-md border border-paper-200 px-2 py-1 text-xs text-paper-500 hover:text-paper-900"
++        className="ring-focus flex h-9 w-9 items-center justify-center rounded-lg border border-paper-200 bg-white text-sm text-paper-500 hover:border-paper-300 hover:text-paper-900"
+       >
+         &rarr;
+       </button>
+@@ -65,13 +65,14 @@ export default function DateControl({
+         <button
+           type="button"
+           onClick={() => onChange(null)}
+-          className="ring-focus rounded-md bg-paper-900 px-2 py-1 text-xs font-medium text-paper-50"
++          className="ring-focus h-9 rounded-lg bg-paper-900 px-3 text-xs font-semibold text-paper-50"
+         >
+           Today
+         </button>
+       )}
+ 
+-      <span className="text-xs text-paper-500">
++      <span className="inline-flex items-center gap-1.5 px-1 text-xs text-paper-500">
++        {live && <span className="h-1.5 w-1.5 rounded-full bg-go-500" aria-hidden="true" />}
+         {live ? 'Live' : formatIsoDateLong(value).replace(/,/g, '')}
+       </span>
+     </div>
+diff --git a/src/components/PairClock.tsx b/src/components/PairClock.tsx
+index 457f171..7a60653 100644
+--- a/src/components/PairClock.tsx
++++ b/src/components/PairClock.tsx
+@@ -1,17 +1,16 @@
+ import { useEffect, useState } from 'react';
+ import { skyState } from '../lib/time/solar';
+ import {
+-  addDays,
+   formatIsoDateLong,
+   formatMinutes,
+   formatOffset,
+-  isValidIsoDate,
+   localMinutesOfDay,
+   offsetMinutes,
+   toIsoDate,
+   zonedDateTimeToInstant,
+ } from '../lib/time/zone';
+ import { convertTime, formatGap, gapOnDate } from '../lib/time/difference';
++import DateControl from './DateControl';
+ 
+ interface Side {
+   name: string;
+@@ -20,15 +19,6 @@ interface Side {
+   slug: string;
+ }
+ 
+-/**
+- * The live, interactive half of a pair page.
+- *
+- * The static half of the page already lists every gap and the dates it applies,
+- * which is the part search engines can read. This is for the reader who has
+- * arrived and now wants to answer their actual question: what is 3pm here over
+- * there, on the day they care about. Changing the date is the whole point, so it
+- * is a first-class control rather than buried.
+- */
+ export default function PairClock({ a, b }: { a: Side; b: Side }) {
+   const [now, setNow] = useState<Date | null>(null);
+   const [date, setDate] = useState<string | null>(null);
+@@ -42,8 +32,8 @@ export default function PairClock({ a, b }: { a: Side; b: Side }) {
+ 
+   if (now === null) {
+     return (
+-      <div className="rounded-2xl border border-paper-200 bg-white p-5">
+-        <p className="text-sm text-paper-500">Reading your clock&hellip;</p>
++      <div className="min-h-72 animate-pulse rounded-[1.75rem] border border-paper-200 bg-white elev">
++        <p className="p-6 text-sm text-paper-500">Reading your clock&hellip;</p>
+       </div>
+     );
+   }
+@@ -52,21 +42,23 @@ export default function PairClock({ a, b }: { a: Side; b: Side }) {
+   const viewDate = date ?? today;
+   const live = date === null && minutes === null;
+   const minutesA = minutes ?? localMinutesOfDay(now, a.timeZone);
+-
+   const converted = convertTime(viewDate, a.timeZone, minutesA, b.timeZone);
+   const gap = gapOnDate(a.timeZone, b.timeZone, viewDate);
+   const gapToday = gapOnDate(a.timeZone, b.timeZone, today);
+-
+-  // Resolved through the zone rather than by subtracting today's offset: on a
+-  // date the other side of a transition, today's offset is the wrong one.
+   const instantA = zonedDateTimeToInstant(viewDate, a.timeZone, minutesA);
+   const skyA = skyState(instantA, a.timeZone, a.latitude);
+   const skyB = skyState(instantA, b.timeZone, b.latitude);
++  const relativeDescription =
++    gap === 0 ? `the same time as ${a.name}` : `${formatGap(gap)} of ${a.name}`;
+ 
+   return (
+-    <div className="space-y-4">
+-      <div className="grid gap-3 sm:grid-cols-2">
++    <section
++      className="overflow-hidden rounded-[1.75rem] border border-paper-200 bg-white elev-lift"
++      aria-label={`Time converter between ${a.name} and ${b.name}`}
++    >
++      <div className="grid sm:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)]">
+         <Panel
++          sideLabel="Starting in"
+           name={a.name}
+           slug={a.slug}
+           minutes={minutesA}
+@@ -74,12 +66,25 @@ export default function PairClock({ a, b }: { a: Side; b: Side }) {
+           offset={offsetMinutes(instantA, a.timeZone)}
+           sky={skyA.state}
+         />
++
++        <div className="flex items-center justify-center border-y border-paper-200 bg-paper-100/60 px-3 py-2 sm:border-x sm:border-y-0">
++          <div className="text-center">
++            <span className="hidden text-lg text-paper-500 sm:block" aria-hidden="true">
++              &rarr;
++            </span>
++            <span className="nums whitespace-nowrap rounded-full border border-paper-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-paper-700">
++              {gap === 0 ? 'same time' : formatGap(gap)}
++            </span>
++          </div>
++        </div>
++
+         <Panel
++          sideLabel="Same moment in"
+           name={b.name}
+           slug={b.slug}
+           minutes={converted.minutes}
+           dayLabel={formatIsoDateLong(
+-            converted.dayShift === 0 ? viewDate : addDays(viewDate, converted.dayShift),
++            converted.dayShift === 0 ? viewDate : toIsoDate(instantA, b.timeZone),
+           )}
+           offset={offsetMinutes(instantA, b.timeZone)}
+           sky={skyB.state}
+@@ -93,61 +98,64 @@ export default function PairClock({ a, b }: { a: Side; b: Side }) {
+         />
+       </div>
+ 
+-      <div className="rounded-2xl border border-paper-200 bg-white p-4 sm:p-5">
+-        <p className="text-sm">
+-          <span className="font-medium">{b.name}</span> is {formatGap(gap)} than{' '}
+-          <span className="font-medium">{a.name}</span> on {formatIsoDateLong(viewDate)}.
+-          {gap !== gapToday && (
+-            <span className="text-warn-700">
+-              {' '}
+-              Today it is {formatGap(gapToday)} &mdash; daylight saving moves the gap between these
+-              two dates.
++      <div className="border-t border-paper-200 bg-paper-50/55 p-4 sm:p-6">
++        <div className="flex flex-wrap items-start justify-between gap-3">
++          <p className="max-w-2xl text-sm leading-relaxed">
++            <strong className="font-semibold">{b.name}</strong> is {relativeDescription} on{' '}
++            {formatIsoDateLong(viewDate)}.
++            {gap !== gapToday && (
++              <span className="text-warn-700">
++                {' '}
++                Today it is {gapToday === 0 ? 'the same time' : formatGap(gapToday)}; daylight
++                saving changes the answer between these dates.
++              </span>
++            )}
++          </p>
++          {live && (
++            <span className="inline-flex items-center gap-1.5 rounded-full border border-paper-200 bg-white px-2.5 py-1 text-[10px] font-semibold text-paper-500">
++              <span className="h-1.5 w-1.5 rounded-full bg-go-500" aria-hidden="true" /> Live
+             </span>
+           )}
+-        </p>
++        </div>
+ 
+-        <label className="mt-4 block">
+-          <span className="text-xs font-medium text-paper-500">Time in {a.name}</span>
++        <label className="mt-5 block">
++          <span className="text-[10px] font-semibold tracking-[0.14em] text-paper-500 uppercase">
++            Time in {a.name}
++          </span>
+           <input
+             type="range"
+             min={0}
+             max={1425}
+             step={15}
+             value={minutesA}
+-            onChange={(e) => setMinutes(Number(e.target.value))}
+-            className="ring-focus mt-1 w-full accent-go-500"
++            onChange={(event) => setMinutes(Number(event.target.value))}
++            className="slider mt-1"
+             aria-label={`Time in ${a.name}`}
++            aria-valuetext={`${formatMinutes(minutesA)} in ${a.name}`}
+           />
+         </label>
++        <div className="nums flex justify-between text-[10px] text-paper-500" aria-hidden="true">
++          <span>00:00</span>
++          <span>06:00</span>
++          <span>12:00</span>
++          <span>18:00</span>
++          <span>00:00</span>
++        </div>
+ 
+-        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+-          <button
+-            type="button"
+-            onClick={() => setDate(addDays(viewDate, -1))}
+-            aria-label="Previous day"
+-            className="ring-focus rounded-md border border-paper-200 px-2 py-1 text-xs text-paper-500 hover:text-paper-900"
+-          >
+-            &larr;
+-          </button>
+-          <label>
+-            <span className="sr-only">Date in {a.name}</span>
+-            <input
+-              type="date"
+-              value={viewDate}
+-              onChange={(e) => {
+-                if (isValidIsoDate(e.target.value)) setDate(e.target.value);
+-              }}
+-              className="ring-focus nums rounded-md border border-paper-200 bg-white px-2 py-1 text-xs"
+-            />
+-          </label>
+-          <button
+-            type="button"
+-            onClick={() => setDate(addDays(viewDate, 1))}
+-            aria-label="Next day"
+-            className="ring-focus rounded-md border border-paper-200 px-2 py-1 text-xs text-paper-500 hover:text-paper-900"
+-          >
+-            &rarr;
+-          </button>
++        <div className="mt-3 flex flex-wrap items-center gap-2">
++          <DateControl
++            date={live ? null : viewDate}
++            today={today}
++            onChange={(next) => {
++              if (next === null) {
++                setDate(null);
++                setMinutes(null);
++              } else {
++                setDate(next);
++              }
++            }}
++            label={`Date in ${a.name}`}
++          />
+           {!live && (
+             <button
+               type="button"
+@@ -155,18 +163,19 @@ export default function PairClock({ a, b }: { a: Side; b: Side }) {
+                 setDate(null);
+                 setMinutes(null);
+               }}
+-              className="ring-focus rounded-md bg-paper-900 px-2 py-1 text-xs font-medium text-paper-50"
++              className="ring-focus h-9 rounded-lg border border-paper-200 bg-white px-3 text-xs font-semibold text-paper-700 hover:border-paper-300"
+             >
+               Back to now
+             </button>
+           )}
+         </div>
+       </div>
+-    </div>
++    </section>
+   );
+ }
+ 
+ function Panel({
++  sideLabel,
+   name,
+   slug,
+   minutes,
+@@ -175,6 +184,7 @@ function Panel({
+   sky,
+   note,
+ }: {
++  sideLabel: string;
+   name: string;
+   slug: string;
+   minutes: number;
+@@ -183,32 +193,36 @@ function Panel({
+   sky: 'day' | 'twilight' | 'night';
+   note?: string;
+ }) {
++  const skyClass =
++    sky === 'day' ? 'bg-sky-day' : sky === 'twilight' ? 'bg-sky-dusk' : 'bg-sky-night';
+   return (
+-    <div className="rounded-2xl border border-paper-200 bg-white p-4 sm:p-5">
+-      <div className="flex items-start justify-between gap-2">
+-        <a href={`/time/${slug}`} className="ring-focus text-sm font-medium hover:underline">
++    <div className={`pair-panel pair-panel-${sky} relative overflow-hidden p-5 sm:p-7`}>
++      <div className="relative z-10">
++        <div className="flex items-center justify-between gap-3">
++          <p className="text-[10px] font-semibold tracking-[0.15em] text-paper-500 uppercase">
++            {sideLabel}
++          </p>
++          <span
++            role="img"
++            aria-label={sky === 'day' ? 'Daylight' : sky === 'twilight' ? 'Twilight' : 'Dark'}
++            className={`h-3 w-3 rounded-full border border-paper-900/10 ${skyClass}`}
++          />
++        </div>
++        <a
++          href={`/time/${slug}`}
++          className="ring-focus mt-3 inline-block rounded text-sm font-semibold hover:underline"
++        >
+           {name}
+         </a>
+-        <span
+-          role="img"
+-          aria-label={sky === 'day' ? 'Daylight' : sky === 'twilight' ? 'Twilight' : 'Dark'}
+-          className={`h-5 w-5 shrink-0 rounded-full border ${
+-            sky === 'day'
+-              ? 'border-sky-day bg-sky-day'
+-              : sky === 'twilight'
+-                ? 'border-sky-dusk bg-sky-dusk'
+-                : 'border-paper-300 bg-sky-night'
+-          }`}
+-        />
++        <p className="nums mt-1 text-5xl font-semibold tracking-[-0.045em] tabular-nums">
++          {formatMinutes(minutes)}
++        </p>
++        <p className="mt-1 text-xs text-paper-500">
++          {dayLabel}
++          {note && <span className="ml-1 font-semibold text-warn-700">({note})</span>}
++        </p>
++        <p className="nums mt-1 text-[11px] text-paper-500">UTC{formatOffset(offset)}</p>
+       </div>
+-      <p className="nums mt-1 text-3xl font-semibold tracking-tight tabular-nums">
+-        {formatMinutes(minutes)}
+-      </p>
+-      <p className="mt-0.5 text-xs text-paper-500">
+-        {dayLabel}
+-        {note && <span className="ml-1 font-medium text-paper-700">({note})</span>}
+-      </p>
+-      <p className="nums mt-0.5 text-[11px] text-paper-500">UTC{formatOffset(offset)}</p>
+     </div>
+   );
+ }
+diff --git a/src/components/TeamPlanner.tsx b/src/components/TeamPlanner.tsx
+index efe8392..64dff61 100644
+--- a/src/components/TeamPlanner.tsx
++++ b/src/components/TeamPlanner.tsx
+@@ -1,6 +1,13 @@
+ import { useEffect, useMemo, useState } from 'react';
++import {
++  buildIcs,
++  googleCalendarUrl,
++  outlookCalendarUrl,
++  type CalendarEvent,
++} from '../lib/time/calendar';
+ import { DEFAULT_WORK_DAYS, isAvailable, type Participant } from '../lib/time/overlap';
+ import { projectMeeting } from '../lib/time/dst';
++import { MEETING_DURATIONS } from '../lib/time/share';
+ import { useScenario } from '../lib/time/useScenario';
+ import {
+   formatIsoDateLong,
+@@ -18,12 +25,16 @@ import DateControl from './DateControl';
+ const SLOTS = 48;
+ const SLOT_MINUTES = 30;
+ const DAY_LABELS = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
++const DAY_NAMES = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+ 
+ export default function TeamPlanner() {
+   const s = useScenario();
+   const [now, setNow] = useState(() => new Date());
+   const [hour12, setHour12] = useState(false);
+   const [copied, setCopied] = useState<'link' | 'text' | null>(null);
++  const [origin, setOrigin] = useState('https://hoursapart.app');
++
++  useEffect(() => setOrigin(window.location.origin), []);
+ 
+   // Only so "today" stays correct if the page is left open past midnight. The
+   // grid does not depend on the seconds, and `today` is a string, so this
+@@ -43,23 +54,89 @@ export default function TeamPlanner() {
+     [viewDate, anchorZone],
+   );
+ 
+-  /** One column per half hour of the base city's local day. */
++  /**
++   * One candidate per half hour of the base city's day. Availability is the
++   * intersection across every slot in the requested meeting, not just its
++   * first instant. Extra samples let late meetings continue past midnight.
++   */
+   const columns = useMemo(() => {
+     if (!s.anchor) return [];
+-    return Array.from({ length: SLOTS }, (_, i) => {
++    const durationSlots = s.durationMinutes / SLOT_MINUTES;
++    const samples = Array.from({ length: SLOTS + durationSlots - 1 }, (_, i) => {
+       const at = new Date(dayStart.getTime() + i * SLOT_MINUTES * 60_000);
+-      const availableIds = s.participants.filter((p) => isAvailable(p, at)).map((p) => p.id);
+       return {
+         at,
++        availableIds: s.participants.filter((p) => isAvailable(p, at)).map((p) => p.id),
++      };
++    });
++
++    return Array.from({ length: SLOTS }, (_, i) => {
++      const availableIds = s.participants
++        .filter((participant) =>
++          samples
++            .slice(i, i + durationSlots)
++            .every((sample) => sample.availableIds.includes(participant.id)),
++        )
++        .map((participant) => participant.id);
++      return {
++        at: samples[i].at,
+         baseMinutes: i * SLOT_MINUTES,
+         availableIds,
+         everyone: availableIds.length === s.participants.length && s.participants.length > 0,
+       };
+     });
+-  }, [s.anchor, dayStart, s.participants]);
++  }, [s.anchor, s.durationMinutes, dayStart, s.participants]);
+ 
+   const fullOverlapSlots = columns.filter((c) => c.everyone).length;
+ 
++  /**
++   * Mobile gets real candidate windows instead of a 46rem-wide, 192-button
++   * miniature timeline. Group adjacent half-hours with identical availability,
++   * then keep the longest useful windows.
++   */
++  const recommendedWindows = useMemo(() => {
++    if (columns.length === 0 || s.participants.length === 0) return [];
++    const targetCount =
++      fullOverlapSlots > 0
++        ? s.participants.length
++        : Math.max(...columns.map((column) => column.availableIds.length));
++    if (targetCount === 0) return [];
++
++    const windows: Array<{
++      startMinutes: number;
++      endMinutes: number;
++      availableIds: string[];
++      missing: Participant[];
++    }> = [];
++    let start = 0;
++    while (start < columns.length) {
++      const key = columns[start].availableIds.join(',');
++      let end = start;
++      while (end + 1 < columns.length && columns[end + 1].availableIds.join(',') === key) {
++        end += 1;
++      }
++      if (columns[start].availableIds.length === targetCount) {
++        windows.push({
++          startMinutes: start * SLOT_MINUTES,
++          endMinutes: end * SLOT_MINUTES + s.durationMinutes,
++          availableIds: columns[start].availableIds,
++          missing: s.participants.filter(
++            (participant) => !columns[start].availableIds.includes(participant.id),
++          ),
++        });
++      }
++      start = end + 1;
++    }
++
++    return windows
++      .sort(
++        (a, b) =>
++          b.endMinutes - b.startMinutes - (a.endMinutes - a.startMinutes) ||
++          a.startMinutes - b.startMinutes,
++      )
++      .slice(0, 4);
++  }, [columns, fullOverlapSlots, s.durationMinutes, s.participants]);
++
+   /**
+    * When nothing suits everybody, "nothing" is a useless answer. Sydney and
+    * London genuinely never share business hours, so the tool would dead-end on
+@@ -90,15 +167,37 @@ export default function TeamPlanner() {
+     return {
+       count: max,
+       startMinutes: run.start * SLOT_MINUTES,
+-      endMinutes: (run.start + run.length) * SLOT_MINUTES,
++      endMinutes: (run.start + run.length - 1) * SLOT_MINUTES + s.durationMinutes,
+       missing: s.participants.filter((p) => !run.ids.includes(p.id)),
+     };
+-  }, [columns, s.participants]);
++  }, [columns, s.durationMinutes, s.participants]);
+ 
+   const meetingAt = useMemo(() => {
+     if (s.meetingMinutes === null) return null;
+     return zonedDateTimeToInstant(viewDate, anchorZone, s.meetingMinutes);
+   }, [viewDate, anchorZone, s.meetingMinutes]);
++  const meetingEndsAt = useMemo(
++    () => (meetingAt ? new Date(meetingAt.getTime() + s.durationMinutes * 60_000) : null),
++    [meetingAt, s.durationMinutes],
++  );
++  const shareLink = `${origin}/overlap?${s.query}`;
++  const calendarEvent = useMemo<CalendarEvent | null>(() => {
++    if (!meetingAt || !meetingEndsAt) return null;
++    return {
++      title: 'Team meeting',
++      start: meetingAt,
++      end: meetingEndsAt,
++      timeZone: anchorZone,
++      details: plainTextSummary(
++        s.participants,
++        meetingAt,
++        meetingEndsAt,
++        s.durationMinutes,
++        hour12,
++        shareLink,
++      ),
++    };
++  }, [meetingAt, meetingEndsAt, anchorZone, s.participants, s.durationMinutes, hour12, shareLink]);
+ 
+   /** The differentiator: which weeks will daylight saving move this meeting? */
+   const shifts = useMemo(() => {
+@@ -110,10 +209,7 @@ export default function TeamPlanner() {
+   }, [s.anchor, s.participants, s.meetingMinutes, dayStart]);
+ 
+   async function copy(kind: 'link' | 'text') {
+-    const value =
+-      kind === 'link'
+-        ? `${window.location.origin}${window.location.pathname}?${s.query}`
+-        : plainTextSummary(s.participants, meetingAt, hour12);
++    const value = kind === 'link' ? shareLink : (calendarEvent?.details ?? '');
+     try {
+       await navigator.clipboard.writeText(value);
+       setCopied(kind);
+@@ -123,95 +219,218 @@ export default function TeamPlanner() {
+     }
+   }
+ 
++  function downloadIcs() {
++    if (!calendarEvent) return;
++    const blob = new Blob([buildIcs(calendarEvent)], { type: 'text/calendar;charset=utf-8' });
++    const url = URL.createObjectURL(blob);
++    const link = document.createElement('a');
++    link.href = url;
++    link.download = `hours-apart-${viewDate}-${String(s.meetingMinutes).padStart(4, '0')}.ics`;
++    document.body.append(link);
++    link.click();
++    link.remove();
++    window.setTimeout(() => URL.revokeObjectURL(url), 0);
++  }
++
+   if (!s.anchor) return null;
+ 
+   return (
+     <div className="space-y-7">
+       {/* ------------------------------------------------------------ headline */}
+-      <section aria-live="polite" className="rounded-2xl border border-paper-200 bg-white p-5">
+-        {fullOverlapSlots > 0 ? (
+-          <>
+-            <p className="text-xs font-medium tracking-wide text-paper-500 uppercase">
+-              Everyone is free for
+-            </p>
+-            <p className="nums mt-1 text-3xl font-semibold tracking-tight">
+-              {formatDuration(fullOverlapSlots * SLOT_MINUTES)}
+-            </p>
+-            <p className="mt-1 text-sm text-paper-500">
+-              on {formatIsoDateLong(viewDate)} &middot; click the darker green to pick a time
+-            </p>
+-          </>
+-        ) : best ? (
+-          <>
+-            <p className="text-xs font-medium tracking-wide text-paper-500 uppercase">
+-              No hour suits everyone
+-            </p>
+-            <p className="mt-1 text-2xl font-semibold tracking-tight">
+-              Closest is {best.count} of {s.participants.length}, for{' '}
+-              {formatDuration(best.endMinutes - best.startMinutes)}
+-            </p>
+-            <p className="nums mt-1 text-sm text-paper-500">
+-              {formatMinutes(best.startMinutes, hour12)}&ndash;
+-              {formatMinutes(best.endMinutes % 1440, hour12)} in {s.anchor.label}
+-              <span className="font-sans">
+-                {', with '}
+-                {joinNames(best.missing.map((p) => p.label))} outside their hours.
+-              </span>
++      <section
++        aria-live="polite"
++        className={`planner-summary rounded-[1.5rem] border p-5 elev sm:p-6 ${
++          fullOverlapSlots > 0
++            ? 'border-go-300 bg-go-100/55'
++            : best
++              ? 'border-warn-400/45 bg-warn-100/50'
++              : 'border-paper-200 bg-white'
++        }`}
++      >
++        <div className="flex flex-wrap items-start justify-between gap-4">
++          <div className="max-w-2xl">
++            <p className="text-[11px] font-semibold tracking-[0.15em] text-paper-500 uppercase">
++              {fullOverlapSlots > 0
++                ? 'A clean overlap exists'
++                : best
++                  ? 'Best available compromise'
++                  : 'No working window today'}
+             </p>
++            {fullOverlapSlots > 0 ? (
++              <>
++                <p className="nums mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
++                  {fullOverlapSlots} {fullOverlapSlots === 1 ? 'start time' : 'start times'} fit
++                </p>
++                <p className="mt-1.5 text-sm leading-relaxed text-paper-700">
++                  Each green start keeps all {s.participants.length} people inside their working
++                  hours for the full {formatDuration(s.durationMinutes)} meeting.
++                </p>
++              </>
++            ) : best ? (
++              <>
++                <p className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">
++                  {best.count} of {s.participants.length} are free for{' '}
++                  {formatDuration(best.endMinutes - best.startMinutes)}
++                </p>
++                <p className="nums mt-1.5 text-sm leading-relaxed text-paper-700">
++                  {formatMinutes(best.startMinutes, hour12)}&ndash;
++                  {formatMinutes(best.endMinutes % 1440, hour12)} in {s.anchor.label}
++                  <span className="font-sans">
++                    {', while '}
++                    {joinNames(best.missing.map((p) => p.label))}{' '}
++                    {best.missing.length === 1 ? 'is' : 'are'} outside their hours.
++                  </span>
++                </p>
++              </>
++            ) : (
++              <>
++                <p className="mt-2 text-2xl font-semibold tracking-tight">Nobody is free today</p>
++                <p className="mt-1.5 text-sm leading-relaxed text-paper-700">
++                  Try the next day, or switch on a working day below.
++                </p>
++              </>
++            )}
++          </div>
++
++          {best && fullOverlapSlots === 0 && (
+             <button
+               type="button"
+               onClick={() => s.setMeetingMinutes(best.startMinutes)}
+-              className="ring-focus mt-3 rounded-lg border border-paper-200 bg-white px-3 py-1.5 text-xs font-medium text-paper-700 hover:border-paper-300"
++              className="ring-focus rounded-xl bg-paper-900 px-4 py-2.5 text-xs font-semibold text-paper-50 elev"
+             >
+-              Use this slot
++              Choose {formatMinutes(best.startMinutes, hour12)}
+             </button>
+-          </>
+-        ) : (
+-          <>
+-            <p className="text-xs font-medium tracking-wide text-paper-500 uppercase">
+-              Nobody is free
+-            </p>
+-            <p className="mt-1 text-lg font-medium">
+-              No one is inside their working hours on this day.
+-            </p>
+-            <p className="mt-1 text-sm text-paper-500">
+-              It is likely a weekend for everybody. Try the next day, or switch a working day on
+-              below.
+-            </p>
+-          </>
+-        )}
++          )}
++        </div>
+       </section>
+ 
+       {/* ---------------------------------------------------------------- grid */}
+-      <section aria-labelledby="grid-heading" className="space-y-1.5">
+-        <div className="flex flex-wrap items-center justify-between gap-2">
+-          <h2 id="grid-heading" className="text-sm font-semibold">
+-            {formatIsoDateLong(viewDate)}
+-          </h2>
+-          <div className="flex items-center gap-1">
++      <section aria-labelledby="grid-heading" className="space-y-3">
++        <div className="flex flex-wrap items-end justify-between gap-3">
++          <div>
++            <p className="text-[10px] font-semibold tracking-[0.15em] text-paper-500 uppercase">
++              Base clock &middot; {s.anchor.label}
++            </p>
++            <h2 id="grid-heading" className="mt-1 text-lg font-semibold">
++              {formatIsoDateLong(viewDate)}
++            </h2>
++          </div>
++          <div className="flex flex-wrap items-center gap-2">
+             <DateControl
+               date={s.date}
+               today={today}
+               onChange={s.setDate}
+               label={`Date in ${s.anchor.label}`}
+             />
+-            <button
+-              type="button"
+-              onClick={() => setHour12((v) => !v)}
+-              className="ring-focus ml-1 rounded-md border border-paper-200 px-2 py-1 text-xs text-paper-500 hover:text-paper-900"
++            <label className="flex h-9 items-center gap-2 rounded-lg border border-paper-200 bg-white px-2 text-xs font-medium text-paper-500">
++              Duration
++              <select
++                value={s.durationMinutes}
++                onChange={(event) =>
++                  s.setDurationMinutes(
++                    Number(event.target.value) as (typeof MEETING_DURATIONS)[number],
++                  )
++                }
++                aria-label="Meeting duration"
++                className="ring-focus nums bg-transparent font-semibold text-paper-900"
++              >
++                {MEETING_DURATIONS.map((minutes) => (
++                  <option key={minutes} value={minutes}>
++                    {formatDuration(minutes)}
++                  </option>
++                ))}
++              </select>
++            </label>
++            <div
++              role="group"
++              aria-label="Time format"
++              className="flex rounded-lg border border-paper-200 bg-white p-0.5"
+             >
+-              {hour12 ? '12h' : '24h'}
+-            </button>
++              {[false, true].map((use12) => (
++                <button
++                  key={String(use12)}
++                  type="button"
++                  aria-pressed={hour12 === use12}
++                  onClick={() => setHour12(use12)}
++                  className={`ring-focus rounded-md px-2 py-1.5 text-xs font-medium ${
++                    hour12 === use12
++                      ? 'bg-paper-900 text-paper-50'
++                      : 'text-paper-500 hover:text-paper-900'
++                  }`}
++                >
++                  {use12 ? '12h' : '24h'}
++                </button>
++              ))}
++            </div>
+           </div>
+         </div>
+ 
+-        <div className="overflow-x-auto rounded-xl border border-paper-200 bg-white">
++        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-paper-500">
++          <span className="inline-flex items-center gap-1.5">
++            <span className="h-2.5 w-2.5 rounded-sm bg-go-300" aria-hidden="true" /> everyone free
++          </span>
++          <span className="inline-flex items-center gap-1.5">
++            <span className="h-2.5 w-2.5 rounded-sm bg-go-100" aria-hidden="true" /> some people
++            free
++          </span>
++        </div>
++
++        <div className="grid gap-2 md:hidden">
++          {recommendedWindows.length > 0 ? (
++            recommendedWindows.map((window) => {
++              const everyone = window.availableIds.length === s.participants.length;
++              const selected = s.meetingMinutes === window.startMinutes;
++              return (
++                <button
++                  key={`${window.startMinutes}-${window.endMinutes}`}
++                  type="button"
++                  aria-pressed={selected}
++                  onClick={() => s.setMeetingMinutes(window.startMinutes)}
++                  className={`ring-focus flex items-center justify-between gap-4 rounded-xl border p-3.5 text-left elev ${
++                    selected
++                      ? 'border-paper-900 bg-paper-900 text-paper-50'
++                      : everyone
++                        ? 'border-go-300 bg-go-100/60'
++                        : 'border-warn-400/40 bg-warn-100/45'
++                  }`}
++                >
++                  <span>
++                    <span className="nums block text-lg font-semibold">
++                      {formatMinutes(window.startMinutes, hour12)}&ndash;
++                      {formatMinutes(window.endMinutes % 1440, hour12)}
++                    </span>
++                    <span
++                      className={`mt-0.5 block text-xs ${selected ? 'text-paper-300' : 'text-paper-500'}`}
++                    >
++                      {everyone
++                        ? `All ${s.participants.length} people are free`
++                        : `${window.availableIds.length} of ${s.participants.length} free · ${joinNames(window.missing.map((person) => person.label))} outside hours`}
++                    </span>
++                  </span>
++                  <span
++                    className={`shrink-0 rounded-lg px-2.5 py-1.5 text-[10px] font-semibold ${
++                      selected ? 'bg-paper-50 text-paper-900' : 'bg-white text-paper-700'
++                    }`}
++                  >
++                    {selected ? 'Selected' : 'Choose'}
++                  </span>
++                </button>
++              );
++            })
++          ) : (
++            <div className="rounded-xl border border-paper-200 bg-white p-4 text-sm text-paper-500 elev">
++              No candidate windows on this day. Try another date or adjust working days below.
++            </div>
++          )}
++        </div>
++
++        <div className="hidden overflow-x-auto rounded-2xl border border-paper-200 bg-white elev md:block">
+           <div className="min-w-[46rem]">
+             <div className="flex border-b border-paper-100 pl-40">
+               {Array.from({ length: 24 }, (_, h) => (
+                 <div
+                   key={h}
+-                  className="nums flex-1 border-l border-paper-100 py-1 text-center text-[10px] text-paper-500"
++                  className="nums flex-1 border-l border-paper-100 py-1.5 text-center text-[10px] text-paper-500"
+                 >
+                   {h % 3 === 0 ? formatMinutes(h * 60, hour12).replace(':00', '') : ''}
+                 </div>
+@@ -225,58 +444,116 @@ export default function TeamPlanner() {
+                 columns={columns}
+                 isAnchor={p.id === s.anchor.id}
+                 hour12={hour12}
+-                meetingAt={meetingAt}
++                meetingMinutes={s.meetingMinutes}
++                durationMinutes={s.durationMinutes}
+                 onPick={(minutes) => s.setMeetingMinutes(minutes)}
+               />
+             ))}
+           </div>
+         </div>
+ 
+-        <p className="text-[11px] text-paper-500">
+-          Columns follow <strong className="font-medium">{s.anchor.label}</strong>'s clock. Each row
+-          shows that person's own local time.
++        <p className="text-[11px] leading-relaxed text-paper-500">
++          Times follow <strong className="font-semibold">{s.anchor.label}</strong>&rsquo;s clock.
++          <span className="hidden md:inline">
++            {' '}
++            Each row is shown in that person&rsquo;s own zone.
++          </span>
+         </p>
+       </section>
+ 
+       {/* -------------------------------------------------------------- people */}
+-      <section aria-labelledby="people-heading" className="space-y-2.5">
+-        <h2 id="people-heading" className="text-sm font-semibold">
+-          Working hours
+-        </h2>
++      <section aria-labelledby="people-heading" className="space-y-3">
++        <div className="flex flex-wrap items-end justify-between gap-2">
++          <div>
++            <h2 id="people-heading" className="text-lg font-semibold">
++              People &amp; working hours
++            </h2>
++            <p className="mt-0.5 text-xs text-paper-500">
++              Each person keeps their own local schedule.
++            </p>
++          </div>
++          <span className="text-[11px] text-paper-500">Up to 12 people</span>
++        </div>
+ 
+-        <ul className="space-y-2">
++        <ul className="grid gap-3 lg:grid-cols-2">
+           {s.participants.map((p, index) => (
+-            <li key={p.id} className="rounded-xl border border-paper-200 bg-white p-3">
+-              <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+-                <input
+-                  value={p.label}
+-                  onChange={(e) => s.update(p.id, { label: e.target.value.slice(0, 40) })}
+-                  aria-label={`Name for ${p.label}`}
+-                  className="ring-focus w-24 rounded-md border border-transparent bg-paper-100 px-2 py-1 text-sm font-medium hover:border-paper-200"
+-                />
+-                <span className="nums text-[11px] text-paper-500">
+-                  {formatOffset(offsetMinutes(dayStart, p.timeZone))}
+-                </span>
+-
+-                <div className="ml-auto flex items-center gap-1">
++            <li key={p.id} className="rounded-2xl border border-paper-200 bg-white p-4 elev">
++              <div className="flex items-start justify-between gap-3">
++                <div className="min-w-0 flex-1">
++                  <input
++                    value={p.label}
++                    onChange={(e) => s.update(p.id, { label: e.target.value.slice(0, 40) })}
++                    aria-label={`Name for ${p.label}`}
++                    className="ring-focus w-full rounded-lg border border-transparent bg-paper-100 px-2.5 py-1.5 text-sm font-semibold hover:border-paper-200"
++                  />
++                  <span className="nums mt-1.5 block text-[11px] text-paper-500">
++                    {p.timeZone.replace(/_/g, ' ')} &middot;{' '}
++                    {formatOffset(offsetMinutes(dayStart, p.timeZone))}
++                  </span>
++                </div>
++
++                <div className="flex shrink-0 items-center gap-1.5">
++                  <button
++                    type="button"
++                    onClick={() => s.setAnchor(index)}
++                    aria-pressed={p.id === s.anchor.id}
++                    className={`ring-focus h-9 rounded-lg px-3 text-[10px] font-semibold ${
++                      p.id === s.anchor.id
++                        ? 'bg-paper-900 text-paper-50'
++                        : 'border border-paper-200 text-paper-700 hover:border-paper-300'
++                    }`}
++                  >
++                    {p.id === s.anchor.id ? 'Base clock' : 'Make base'}
++                  </button>
++                  <button
++                    type="button"
++                    onClick={() => s.remove(p.id)}
++                    disabled={s.participants.length === 1}
++                    aria-label={`Remove ${p.label}`}
++                    className="ring-focus flex h-9 w-9 items-center justify-center rounded-lg border border-paper-200 text-paper-500 hover:border-paper-300 hover:text-paper-900 disabled:opacity-25"
++                  >
++                    <svg width="13" height="13" viewBox="0 0 12 12" aria-hidden="true">
++                      <path
++                        d="M3 3l6 6m0-6l-6 6"
++                        stroke="currentColor"
++                        strokeWidth="1.7"
++                        fill="none"
++                        strokeLinecap="round"
++                      />
++                    </svg>
++                  </button>
++                </div>
++              </div>
++
++              <div className="mt-4 grid grid-cols-2 gap-2">
++                <label className="text-[10px] font-semibold tracking-wide text-paper-500 uppercase">
++                  Starts
+                   <TimeSelect
+                     value={p.workStart}
+                     hour12={hour12}
+                     onChange={(v) => s.update(p.id, { workStart: v })}
+                     label={`Work start for ${p.label}`}
+                   />
+-                  <span aria-hidden="true" className="text-xs text-paper-500">
+-                    &ndash;
+-                  </span>
++                </label>
++                <label className="text-[10px] font-semibold tracking-wide text-paper-500 uppercase">
++                  Finishes
+                   <TimeSelect
+                     value={p.workEnd}
+                     hour12={hour12}
+                     onChange={(v) => s.update(p.id, { workEnd: v })}
+                     label={`Work end for ${p.label}`}
+                   />
+-                </div>
++                </label>
++              </div>
+ 
+-                <div className="flex gap-0.5" role="group" aria-label={`Work days for ${p.label}`}>
++              <fieldset className="mt-3">
++                <legend className="text-[10px] font-semibold tracking-wide text-paper-500 uppercase">
++                  Working days
++                </legend>
++                <div
++                  className="mt-1.5 grid grid-cols-7 gap-1"
++                  aria-label={`Work days for ${p.label}`}
++                >
+                   {DAY_LABELS.map((d, day) => {
+                     const on = (p.workDays ?? DEFAULT_WORK_DAYS).includes(day);
+                     return (
+@@ -284,14 +561,14 @@ export default function TeamPlanner() {
+                         key={day}
+                         type="button"
+                         aria-pressed={on}
+-                        aria-label={`${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'][day]} for ${p.label}`}
++                        aria-label={`${DAY_NAMES[day]} for ${p.label}`}
+                         onClick={() => {
+                           const days = new Set(p.workDays ?? DEFAULT_WORK_DAYS);
+                           if (days.has(day)) days.delete(day);
+                           else days.add(day);
+                           s.update(p.id, { workDays: [...days].sort() });
+                         }}
+-                        className={`ring-focus h-6 w-6 rounded text-[10px] font-medium transition-colors ${
++                        className={`ring-focus h-9 rounded-lg text-[10px] font-semibold transition-colors ${
+                           on
+                             ? 'bg-paper-900 text-paper-50'
+                             : 'bg-paper-100 text-paper-500 hover:bg-paper-200'
+@@ -302,60 +579,31 @@ export default function TeamPlanner() {
+                     );
+                   })}
+                 </div>
+-
+-                <button
+-                  type="button"
+-                  onClick={() => s.setAnchor(index)}
+-                  title="Pin the meeting to this person's local clock"
+-                  className={`ring-focus rounded-md px-2 py-1 text-[10px] transition-colors ${
+-                    p.id === s.anchor.id
+-                      ? 'bg-paper-900 text-paper-50'
+-                      : 'text-paper-500 hover:text-paper-900'
+-                  }`}
+-                >
+-                  {p.id === s.anchor.id ? 'base' : 'set base'}
+-                </button>
+-
+-                <button
+-                  type="button"
+-                  onClick={() => s.remove(p.id)}
+-                  disabled={s.participants.length === 1}
+-                  aria-label={`Remove ${p.label}`}
+-                  className="ring-focus rounded p-1 text-paper-500 hover:text-paper-900 disabled:opacity-25"
+-                >
+-                  <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
+-                    <path
+-                      d="M3 3l6 6m0-6l-6 6"
+-                      stroke="currentColor"
+-                      strokeWidth="1.7"
+-                      fill="none"
+-                      strokeLinecap="round"
+-                    />
+-                  </svg>
+-                </button>
+-              </div>
++              </fieldset>
+             </li>
+           ))}
+         </ul>
+ 
+-        <CityPicker
+-          onAdd={(city) => s.add(city.timeZone, city.name)}
+-          placeholder="Add someone — city, airport code, or country"
+-        />
++        <div className="rounded-2xl border border-dashed border-paper-300 bg-paper-100/45 p-3">
++          <CityPicker
++            onAdd={(city) => s.add(city.timeZone, city.name)}
++            placeholder="Add someone — city, airport code, or country"
++          />
++        </div>
+       </section>
+ 
+       {/* ------------------------------------------------- chosen time + DST */}
+       {meetingAt && (
+         <section aria-labelledby="meeting-heading" className="space-y-3">
+           <h2 id="meeting-heading" className="text-sm font-semibold">
+-            {formatMinutes(s.meetingMinutes!, hour12)} in {s.anchor.label}
++            {formatLocalRange(meetingAt, meetingEndsAt!, s.anchor.timeZone, hour12)} in{' '}
++            {s.anchor.label} &middot; {formatDuration(s.durationMinutes)}
+           </h2>
+ 
+-          <ul className="divide-y divide-paper-100 rounded-xl border border-paper-200 bg-white">
++          <ul className="divide-y divide-paper-100 rounded-xl border border-paper-200 bg-white elev">
+             {s.participants.map((p) => {
+-              const parts = zonedParts(meetingAt, p.timeZone);
+               const shift = calendarDayShift(meetingAt, p.timeZone, s.anchor.timeZone);
+-              const inHours = isAvailable(p, meetingAt);
++              const inHours = isAvailableForMeeting(p, meetingAt, s.durationMinutes);
+               return (
+                 <li
+                   key={p.id}
+@@ -369,7 +617,7 @@ export default function TeamPlanner() {
+                       </span>
+                     )}
+                     <span className="font-medium">
+-                      {formatMinutes(parts.hour * 60 + parts.minute, hour12)}
++                      {formatLocalRange(meetingAt, meetingEndsAt!, p.timeZone, hour12)}
+                     </span>
+                     {shift !== 0 && (
+                       <span className="text-[11px] text-paper-500">
+@@ -419,29 +667,64 @@ export default function TeamPlanner() {
+       )}
+ 
+       {/* --------------------------------------------------------------- share */}
+-      <section className="flex flex-wrap items-center gap-2">
+-        <button
+-          type="button"
+-          onClick={() => copy('link')}
+-          className="ring-focus rounded-lg bg-paper-900 px-4 py-2 text-sm font-medium text-paper-50 hover:opacity-90"
+-        >
+-          {copied === 'link' ? 'Link copied' : 'Copy shareable link'}
+-        </button>
+-        {meetingAt && (
++      <section aria-labelledby="share-heading" className="space-y-3">
++        <div>
++          <h2 id="share-heading" className="text-sm font-semibold">
++            Share &amp; add to calendar
++          </h2>
++          <p className="mt-0.5 text-xs text-paper-500">
++            The link keeps the cities, date, start time, and meeting length together.
++          </p>
++        </div>
++        <div className="flex flex-wrap items-center gap-2">
+           <button
+             type="button"
+-            onClick={() => copy('text')}
+-            className="ring-focus rounded-lg border border-paper-200 bg-white px-4 py-2 text-sm font-medium text-paper-700 hover:border-paper-300"
++            onClick={() => copy('link')}
++            className="ring-focus elev elev-hover rounded-xl bg-paper-900 px-4 py-2.5 text-sm font-semibold text-paper-50"
+           >
+-            {copied === 'text' ? 'Copied' : 'Copy for a calendar invite'}
++            {copied === 'link' ? 'Link copied' : 'Copy shareable link'}
+           </button>
+-        )}
+-        <a
+-          href={`/?${s.query}`}
+-          className="ring-focus rounded-lg px-2 py-2 text-sm text-paper-500 hover:text-paper-900"
+-        >
+-          &larr; Back to the clock
+-        </a>
++          {calendarEvent && (
++            <>
++              <button
++                type="button"
++                onClick={downloadIcs}
++                className="ring-focus rounded-lg border border-paper-200 bg-white px-4 py-2 text-sm font-medium text-paper-700 hover:border-paper-300"
++              >
++                Download .ics
++              </button>
++              <a
++                href={googleCalendarUrl(calendarEvent)}
++                target="_blank"
++                rel="noreferrer"
++                className="ring-focus rounded-lg border border-paper-200 bg-white px-4 py-2 text-sm font-medium text-paper-700 hover:border-paper-300"
++              >
++                Google Calendar
++              </a>
++              <a
++                href={outlookCalendarUrl(calendarEvent)}
++                target="_blank"
++                rel="noreferrer"
++                className="ring-focus rounded-lg border border-paper-200 bg-white px-4 py-2 text-sm font-medium text-paper-700 hover:border-paper-300"
++              >
++                Outlook
++              </a>
++              <button
++                type="button"
++                onClick={() => copy('text')}
++                className="ring-focus rounded-lg px-3 py-2 text-sm text-paper-500 hover:text-paper-900"
++              >
++                {copied === 'text' ? 'Summary copied' : 'Copy meeting summary'}
++              </button>
++            </>
++          )}
++          <a
++            href={`/?${s.query}`}
++            className="ring-focus rounded-lg px-2 py-2 text-sm text-paper-500 hover:text-paper-900"
++          >
++            &larr; Back to the clock
++          </a>
++        </div>
+       </section>
+     </div>
+   );
+@@ -454,14 +737,16 @@ function Row({
+   columns,
+   isAnchor,
+   hour12,
+-  meetingAt,
++  meetingMinutes,
++  durationMinutes,
+   onPick,
+ }: {
+   participant: Participant;
+   columns: Array<{ at: Date; baseMinutes: number; availableIds: string[]; everyone: boolean }>;
+   isAnchor: boolean;
+   hour12: boolean;
+-  meetingAt: Date | null;
++  meetingMinutes: number | null;
++  durationMinutes: number;
+   onPick: (minutes: number) => void;
+ }) {
+   const offset = columns.length > 0 ? offsetMinutes(columns[0].at, participant.timeZone) : 0;
+@@ -480,8 +765,9 @@ function Row({
+         {columns.map((col) => {
+           const available = col.availableIds.includes(participant.id);
+           const selected =
+-            meetingAt !== null &&
+-            Math.abs(col.at.getTime() - meetingAt.getTime()) < (SLOT_MINUTES * 60_000) / 2;
++            meetingMinutes !== null &&
++            col.baseMinutes >= meetingMinutes &&
++            col.baseMinutes < meetingMinutes + durationMinutes;
+           const local = zonedParts(col.at, participant.timeZone);
+ 
+           return (
+@@ -526,7 +812,7 @@ function TimeSelect({
+       value={value}
+       aria-label={label}
+       onChange={(e) => onChange(Number(e.target.value))}
+-      className="ring-focus nums rounded-md border border-paper-200 bg-white px-1 py-0.5 text-xs"
++      className="ring-focus nums mt-1 block h-10 w-full rounded-lg border border-paper-200 bg-white px-2.5 text-sm font-medium text-paper-900"
+     >
+       {Array.from({ length: 48 }, (_, i) => i * 30).map((m) => (
+         <option key={m} value={m}>
+@@ -537,6 +823,31 @@ function TimeSelect({
+   );
+ }
+ 
++function isAvailableForMeeting(
++  participant: Participant,
++  meetingAt: Date,
++  durationMinutes: number,
++): boolean {
++  for (let elapsed = 0; elapsed < durationMinutes; elapsed += SLOT_MINUTES) {
++    if (!isAvailable(participant, new Date(meetingAt.getTime() + elapsed * 60_000))) return false;
++  }
++  return true;
++}
++
++function formatLocalRange(start: Date, end: Date, timeZone: string, hour12: boolean): string {
++  const startParts = zonedParts(start, timeZone);
++  const endParts = zonedParts(end, timeZone);
++  const startMinutes = startParts.hour * 60 + startParts.minute;
++  const endMinutes = endParts.hour * 60 + endParts.minute;
++  const dayDelta = Math.round(
++    (Date.UTC(endParts.year, endParts.month - 1, endParts.day) -
++      Date.UTC(startParts.year, startParts.month - 1, startParts.day)) /
++      86_400_000,
++  );
++  const dayNote = dayDelta === 0 ? '' : dayDelta > 0 ? ` (+${dayDelta} day)` : ` (${dayDelta} day)`;
++  return `${formatMinutes(startMinutes, hour12)}–${formatMinutes(endMinutes, hour12)}${dayNote}`;
++}
++
+ function calendarDayShift(instant: Date, timeZone: string, baseZone: string): number {
+   const a = zonedParts(instant, timeZone);
+   const b = zonedParts(instant, baseZone);
+@@ -568,14 +879,21 @@ function formatShiftDate(instant: Date): string {
+ /** A block to paste straight into a calendar invite or a chat. */
+ function plainTextSummary(
+   participants: Participant[],
+-  meetingAt: Date | null,
++  meetingAt: Date,
++  meetingEndsAt: Date,
++  durationMinutes: number,
+   hour12: boolean,
++  shareLink: string,
+ ): string {
+-  if (!meetingAt) return '';
+-  const lines = participants.map((p) => {
+-    const parts = zonedParts(meetingAt, p.timeZone);
+-    return `${p.label}: ${formatMinutes(parts.hour * 60 + parts.minute, hour12)} (${p.timeZone})`;
+-  });
+-  const iso = meetingAt.toISOString();
+-  return `${lines.join('\n')}\n\nUTC: ${iso.slice(11, 16)} on ${iso.slice(0, 10)}`;
++  const lines = participants.map(
++    (participant) =>
++      `${participant.label}: ${formatLocalRange(meetingAt, meetingEndsAt, participant.timeZone, hour12)} (${participant.timeZone})`,
++  );
++  return [
++    ...lines,
++    '',
++    `Duration: ${formatDuration(durationMinutes)}`,
++    `UTC: ${meetingAt.toISOString()} – ${meetingEndsAt.toISOString()}`,
++    `Hours Apart: ${shareLink}`,
++  ].join('\n');
+ }
+diff --git a/src/components/WorldClock.tsx b/src/components/WorldClock.tsx
+index e7d82a3..8c909b5 100644
+--- a/src/components/WorldClock.tsx
++++ b/src/components/WorldClock.tsx
+@@ -1,4 +1,4 @@
+-import { useEffect, useMemo, useState } from 'react';
++import { useEffect, useMemo, useState, type CSSProperties } from 'react';
+ import { useScenario } from '../lib/time/useScenario';
+ import { latitudeFor } from '../lib/time/cities';
+ import { skyState, type SkyState } from '../lib/time/solar';
+@@ -19,10 +19,11 @@ import DateControl from './DateControl';
+ /** 30-minute resolution for the sky strip: smooth enough, cheap enough. */
+ const STRIP_STEPS = 48;
+ 
+-const SKY_CLASS: Record<SkyState, string> = {
+-  day: 'bg-sky-day',
+-  twilight: 'bg-sky-dusk',
+-  night: 'bg-sky-night',
++/** Theme variables, so the strip re-themes with the rest of the site. */
++const SKY_VAR: Record<SkyState, string> = {
++  day: 'var(--color-sky-day)',
++  twilight: 'var(--color-sky-dusk)',
++  night: 'var(--color-sky-night)',
+ };
+ 
+ export default function WorldClock() {
+@@ -82,79 +83,101 @@ export default function WorldClock() {
+   return (
+     <div className="space-y-6">
+       {/* ------------------------------------------------------------ scrubber */}
+-      <section className="rounded-2xl border border-paper-200 bg-white p-4 sm:p-5">
+-        <div className="flex flex-wrap items-baseline justify-between gap-2">
+-          <div>
+-            <p className="text-xs font-medium tracking-wide text-paper-500 uppercase">
+-              {isLive ? 'Right now' : `In ${s.anchor.label}`}
+-            </p>
+-            <p className="nums mt-0.5 text-2xl font-semibold tracking-tight tabular-nums">
+-              {formatMinutes(viewMinutes, hour12)}
+-              <span className="ml-2 text-sm font-normal text-paper-500">in {s.anchor.label}</span>
+-            </p>
+-          </div>
+-
+-          <div className="flex items-center gap-1.5">
+-            {!isLive && (
+-              <button
+-                type="button"
+-                onClick={() => {
+-                  s.setMeetingMinutes(null);
+-                  s.setDate(null);
+-                }}
+-                className="ring-focus rounded-md bg-paper-900 px-2.5 py-1 text-xs font-medium text-paper-50"
++      <section className="clock-console overflow-hidden rounded-[1.75rem] border border-paper-900 bg-paper-900 text-paper-50 elev-lift">
++        <div className="p-5 sm:p-7">
++          <div className="flex flex-wrap items-start justify-between gap-4">
++            <div>
++              <div className="flex items-center gap-2">
++                {isLive && <span className="h-2 w-2 rounded-full bg-go-500" aria-hidden="true" />}
++                <p className="text-[11px] font-semibold tracking-[0.16em] text-paper-300 uppercase">
++                  {isLive ? 'Live in your base city' : `Previewing ${s.anchor.label}`}
++                </p>
++              </div>
++              <p className="nums mt-2 text-5xl font-semibold tracking-[-0.045em] tabular-nums sm:text-6xl">
++                {formatMinutes(viewMinutes, hour12)}
++              </p>
++              <p className="mt-1 text-sm text-paper-300">
++                {s.anchor.label} sets the clock for every city below
++              </p>
++            </div>
++
++            <div className="flex flex-wrap items-center gap-2">
++              {!isLive && (
++                <button
++                  type="button"
++                  onClick={() => {
++                    s.setMeetingMinutes(null);
++                    s.setDate(null);
++                  }}
++                  className="ring-focus h-9 rounded-lg bg-paper-50 px-3 text-xs font-semibold text-paper-900"
++                >
++                  Back to now
++                </button>
++              )}
++              <div
++                role="group"
++                aria-label="Time format"
++                className="flex rounded-lg border border-paper-700/40 bg-paper-50/10 p-0.5"
+               >
+-                Back to now
+-              </button>
+-            )}
+-            <button
+-              type="button"
+-              onClick={() => setHour12((v) => !v)}
+-              className="ring-focus rounded-md border border-paper-200 px-2 py-1 text-xs text-paper-500 hover:text-paper-900"
+-            >
+-              {hour12 ? '12h' : '24h'}
+-            </button>
++                {[false, true].map((use12) => (
++                  <button
++                    key={String(use12)}
++                    type="button"
++                    aria-pressed={hour12 === use12}
++                    onClick={() => setHour12(use12)}
++                    className={`ring-focus rounded-md px-2.5 py-1.5 text-xs font-medium transition-colors ${
++                      hour12 === use12
++                        ? 'bg-paper-50 text-paper-900'
++                        : 'text-paper-300 hover:text-paper-50'
++                    }`}
++                  >
++                    {use12 ? '12h' : '24h'}
++                  </button>
++                ))}
++              </div>
++            </div>
+           </div>
+-        </div>
+ 
+-        <label className="mt-3 block">
+-          <span className="sr-only">Pick a time in {s.anchor.label}</span>
+-          <input
+-            type="range"
+-            min={0}
+-            max={1425}
+-            step={15}
+-            value={viewMinutes}
+-            onChange={(e) => s.setMeetingMinutes(Number(e.target.value))}
+-            className="ring-focus w-full accent-go-500"
+-          />
+-        </label>
+-        <div className="nums flex justify-between text-[10px] text-paper-500">
+-          {[0, 6, 12, 18, 24].map((h) => (
+-            <span key={h}>{formatMinutes((h % 24) * 60, hour12)}</span>
+-          ))}
++          <label className="mt-7 block">
++            <span className="sr-only">Pick a time in {s.anchor.label}</span>
++            <input
++              type="range"
++              min={0}
++              max={1425}
++              step={15}
++              value={viewMinutes}
++              onChange={(e) => s.setMeetingMinutes(Number(e.target.value))}
++              className="slider"
++              aria-valuetext={`${formatMinutes(viewMinutes, hour12)} in ${s.anchor.label}`}
++            />
++          </label>
++          <div className="nums flex justify-between text-[10px] text-paper-300">
++            {[0, 6, 12, 18, 24].map((h) => (
++              <span key={h}>{formatMinutes((h % 24) * 60, hour12)}</span>
++            ))}
++          </div>
+         </div>
+ 
+-        <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-paper-100 pt-3">
++        <div className="border-t border-paper-700/30 bg-paper-50 p-3 text-paper-900 sm:flex sm:items-center sm:justify-between sm:gap-4 sm:px-5">
+           <DateControl
+             date={s.date}
+             today={today}
+             onChange={s.setDate}
+             label={`Date in ${s.anchor.label}`}
+           />
+-        </div>
+ 
+-        {anchorOffsetViewed !== anchorOffsetToday ? (
+-          <p className="mt-2 text-[11px] leading-relaxed text-warn-700">
+-            On this date {s.anchor.label} is on {formatOffset(anchorOffsetViewed)} rather than
+-            today's {formatOffset(anchorOffsetToday)}, so its gap to every other city has moved by{' '}
+-            {formatHours(Math.abs(anchorOffsetViewed - anchorOffsetToday))}.
+-          </p>
+-        ) : (
+-          <p className="mt-2 text-[11px] text-paper-500">
+-            Pick a date to see how daylight saving changes these gaps &mdash; they are not fixed.
+-          </p>
+-        )}
++          {anchorOffsetViewed !== anchorOffsetToday ? (
++            <p className="mt-2 max-w-md text-[11px] leading-relaxed text-warn-700 sm:mt-0 sm:text-right">
++              On this date, {s.anchor.label}&rsquo;s offset moves by{' '}
++              {formatHours(Math.abs(anchorOffsetViewed - anchorOffsetToday))}. Every gap below
++              updates.
++            </p>
++          ) : (
++            <p className="mt-2 max-w-sm text-[11px] leading-relaxed text-paper-500 sm:mt-0 sm:text-right">
++              Choose a future date to reveal daylight-saving drift.
++            </p>
++          )}
++        </div>
+       </section>
+ 
+       {/* --------------------------------------------------------------- cities */}
+@@ -186,13 +209,13 @@ export default function WorldClock() {
+         <button
+           type="button"
+           onClick={copyLink}
+-          className="ring-focus rounded-lg bg-paper-900 px-4 py-2 text-sm font-medium text-paper-50 hover:opacity-90"
++          className="ring-focus rounded-xl bg-paper-900 px-4 py-2.5 text-sm font-medium text-paper-50 elev elev-hover"
+         >
+           {copied ? 'Link copied' : 'Copy this clock as a link'}
+         </button>
+         <a
+           href={`/overlap?${s.query}`}
+-          className="ring-focus rounded-lg border border-paper-200 bg-white px-4 py-2 text-sm font-medium text-paper-700 hover:border-paper-300"
++          className="ring-focus rounded-xl border border-paper-200 bg-white px-4 py-2.5 text-sm font-medium text-paper-700 elev transition-shadow hover:border-paper-300 hover:elev-lift"
+         >
+           Find a meeting time &rarr;
+         </a>
+@@ -257,7 +280,12 @@ function CityRow({
+ 
+   const dayShift = calendarDayShift(instant, timeZone, anchorZone);
+ 
+-  /** 24h sky strip for this city's local day. Recomputed once a day, not per tick. */
++  /**
++   * This city's local day as CSS gradient stops, rather than a row of abutted
++   * blocks. Emitting one stop per sample lets the browser interpolate, so dawn
++   * and dusk actually look like transitions instead of steps. Recomputed once a
++   * day, not per tick.
++   */
+   const strip = useMemo(() => {
+     if (lat === undefined) return null;
+     const midnight = zonedDateTimeToInstant(
+@@ -265,71 +293,78 @@ function CityRow({
+       timeZone,
+       0,
+     );
+-    return Array.from({ length: STRIP_STEPS }, (_, i) => {
++    return Array.from({ length: STRIP_STEPS + 1 }, (_, i) => {
+       const at = new Date(midnight.getTime() + i * (1440 / STRIP_STEPS) * 60_000);
+-      return skyState(at, timeZone, lat).state;
+-    });
++      const { state } = skyState(at, timeZone, lat);
++      return `${SKY_VAR[state]} ${((i / STRIP_STEPS) * 100).toFixed(2)}%`;
++    }).join(', ');
+   }, [timeZone, lat, parts.year, parts.month, parts.day]);
+ 
+   return (
+-    <li className="rounded-xl border border-paper-200 bg-white">
+-      <div className="flex items-center gap-3 px-3 py-2.5 sm:px-4">
+-        {/* reorder */}
+-        <div className="flex shrink-0 flex-col">
++    <li className="overflow-hidden rounded-2xl border border-paper-200 bg-white elev elev-hover">
++      <div className="city-row-layout p-4 sm:px-5">
++        <div className="city-row-order flex items-center gap-1 sm:flex-col sm:gap-0">
+           <button
+             type="button"
+             onClick={() => onMove(-1)}
+             disabled={index === 0}
+             aria-label={`Move ${label} up`}
+-            className="ring-focus px-1 text-[9px] leading-tight text-paper-500 hover:text-paper-900 disabled:opacity-25"
++            className="ring-focus flex h-8 w-8 items-center justify-center rounded-lg border border-paper-200 text-xs text-paper-500 hover:border-paper-300 hover:text-paper-900 disabled:opacity-25"
+           >
+-            &#9650;
++            &#8593;
+           </button>
+           <button
+             type="button"
+             onClick={() => onMove(1)}
+             disabled={index === total - 1}
+             aria-label={`Move ${label} down`}
+-            className="ring-focus px-1 text-[9px] leading-tight text-paper-500 hover:text-paper-900 disabled:opacity-25"
++            className="ring-focus flex h-8 w-8 items-center justify-center rounded-lg border border-paper-200 text-xs text-paper-500 hover:border-paper-300 hover:text-paper-900 disabled:opacity-25"
+           >
+-            &#9660;
++            &#8595;
+           </button>
+         </div>
+ 
+-        <SkyDot state={sky.state} />
++        <div className="city-row-sky-dot pt-0.5">
++          <SkyDot state={sky.state} />
++        </div>
+ 
+-        {/* name + offset */}
+-        <div className="min-w-0 flex-1">
+-          <input
+-            value={label}
+-            onChange={(e) => onRename(e.target.value.slice(0, 40))}
+-            aria-label={`Name for ${label}`}
+-            className="ring-focus w-full truncate rounded border border-transparent bg-transparent text-sm font-medium hover:border-paper-200"
+-          />
+-          <p className="nums text-[11px] text-paper-500">
+-            {formatOffset(offsetHere)}
++        <div className="city-row-identity min-w-0">
++          <div className="flex min-w-0 items-center gap-2">
++            <input
++              value={label}
++              onChange={(e) => onRename(e.target.value.slice(0, 40))}
++              aria-label={`Name for ${label}`}
++              className="ring-focus min-w-0 flex-1 truncate rounded-lg border border-transparent bg-transparent px-1 py-0.5 text-base font-semibold hover:border-paper-200"
++            />
++            {isAnchor && (
++              <span className="shrink-0 rounded-full bg-go-100 px-2 py-0.5 text-[9px] font-semibold tracking-wide text-go-700 uppercase">
++                base
++              </span>
++            )}
++          </div>
++          <p className="nums mt-1 flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] text-paper-500">
++            <span>UTC{formatOffset(offsetHere)}</span>
+             {relative !== 0 && (
+-              <span className="ml-1.5">
++              <span>
+                 {relative > 0 ? '+' : '−'}
+                 {formatHours(Math.abs(relative))} from you
+               </span>
+             )}
+             {offsetShift !== 0 && (
+-              <span className="ml-1.5 rounded bg-warn-100 px-1 py-px font-medium text-warn-700">
++              <span className="rounded-md bg-warn-100 px-1.5 py-0.5 font-semibold text-warn-700">
+                 {offsetShift > 0 ? '+' : '−'}
+                 {formatHours(Math.abs(offsetShift))} vs today
+               </span>
+             )}
+-            {sky.approximate && <span className="ml-1.5 opacity-70">· sky estimated</span>}
++            {sky.approximate && <span className="opacity-70">sky estimated</span>}
+           </p>
+         </div>
+ 
+-        {/* time */}
+-        <div className="shrink-0 text-right">
+-          <p className="nums text-xl font-semibold tabular-nums">
++        <div className="city-row-time text-right">
++          <p className="nums text-2xl font-semibold tracking-tight tabular-nums">
+             {formatMinutes(minutes, hour12)}
+           </p>
+-          <p className="text-[11px] text-paper-500">
++          <p className="mt-0.5 whitespace-nowrap text-[11px] text-paper-500">
+             {new Intl.DateTimeFormat('en', {
+               timeZone,
+               weekday: 'short',
+@@ -337,31 +372,32 @@ function CityRow({
+               month: 'short',
+             }).format(instant)}
+             {dayShift !== 0 && (
+-              <span className="ml-1 font-medium">{dayShift > 0 ? 'next day' : 'prev day'}</span>
++              <span className="ml-1 font-semibold text-warn-700">
++                {dayShift > 0 ? 'next day' : 'prev day'}
++              </span>
+             )}
+           </p>
+         </div>
+ 
+-        {/* actions */}
+-        <div className="flex shrink-0 items-center gap-1">
+-          <button
+-            type="button"
+-            onClick={onSetAnchor}
+-            title="Use this city's clock for the slider"
+-            className={`ring-focus rounded px-1.5 py-0.5 text-[10px] ${
+-              isAnchor ? 'bg-paper-900 text-paper-50' : 'text-paper-500 hover:text-paper-900'
+-            }`}
+-          >
+-            {isAnchor ? 'base' : 'set base'}
+-          </button>
++        <div className="city-row-actions flex items-center justify-end gap-1.5">
++          {!isAnchor && (
++            <button
++              type="button"
++              onClick={onSetAnchor}
++              title="Use this city's clock for the slider"
++              className="ring-focus h-9 rounded-lg border border-paper-200 px-3 text-[11px] font-semibold text-paper-700 hover:border-paper-300"
++            >
++              Set as base
++            </button>
++          )}
+           <button
+             type="button"
+             onClick={onRemove}
+             disabled={total === 1}
+             aria-label={`Remove ${label}`}
+-            className="ring-focus rounded p-1 text-paper-500 hover:text-paper-900 disabled:opacity-25"
++            className="ring-focus flex h-9 w-9 items-center justify-center rounded-lg border border-paper-200 text-paper-500 hover:border-paper-300 hover:text-paper-900 disabled:opacity-25"
+           >
+-            <svg width="11" height="11" viewBox="0 0 12 12" aria-hidden="true">
++            <svg width="13" height="13" viewBox="0 0 12 12" aria-hidden="true">
+               <path
+                 d="M3 3l6 6m0-6l-6 6"
+                 stroke="currentColor"
+@@ -372,23 +408,22 @@ function CityRow({
+             </svg>
+           </button>
+         </div>
+-      </div>
+ 
+-      {/* sky strip: where in their daylight this moment sits */}
+-      {strip && (
+-        <div className="relative mx-3 mb-2.5 h-1.5 overflow-hidden rounded-full sm:mx-4">
+-          <div className="flex h-full">
+-            {strip.map((state, i) => (
+-              <div key={i} className={`flex-1 ${SKY_CLASS[state]}`} />
+-            ))}
+-          </div>
++        {strip && (
+           <div
+-            className="absolute top-0 h-full w-0.5 bg-paper-900"
+-            style={{ left: `calc(${(minutes / 1440) * 100}% - 1px)` }}
+-            aria-hidden="true"
+-          />
+-        </div>
+-      )}
++            className="city-row-strip sky-strip relative h-3 overflow-hidden rounded-full"
++            style={{ '--sky-stops': strip } as CSSProperties}
++            role="img"
++            aria-label={`${label}'s daylight pattern; marker at ${formatMinutes(minutes, hour12)}`}
++          >
++            <div
++              className="sky-marker absolute top-0 h-full w-0.5 rounded-full bg-paper-900"
++              style={{ left: `calc(${(minutes / 1440) * 100}% - 1px)` }}
++              aria-hidden="true"
++            />
++          </div>
++        )}
++      </div>
+     </li>
+   );
+ }
+@@ -397,18 +432,23 @@ function CityRow({
+ 
+ function SkyDot({ state }: { state: SkyState }) {
+   const title = state === 'day' ? 'Daylight' : state === 'twilight' ? 'Twilight' : 'Dark';
++  /*
++   * Daylight gets a soft halo, dusk a fainter one, night none at all. A flat
++   * disc read as a status LED; the glow makes it read as a little sun.
++   */
++  const ring =
++    state === 'day'
++      ? 'border-sky-day bg-sky-day shadow-[0_0_0_3px_color-mix(in_oklab,var(--color-sky-day)_28%,transparent)]'
++      : state === 'twilight'
++        ? 'border-sky-dusk bg-sky-dusk shadow-[0_0_0_3px_color-mix(in_oklab,var(--color-sky-dusk)_24%,transparent)]'
++        : 'border-paper-300 bg-sky-night';
++
+   return (
+     <span
+       title={title}
+       aria-label={title}
+       role="img"
+-      className={`h-6 w-6 shrink-0 rounded-full border ${
+-        state === 'day'
+-          ? 'border-sky-day bg-sky-day'
+-          : state === 'twilight'
+-            ? 'border-sky-dusk bg-sky-dusk'
+-            : 'border-paper-300 bg-sky-night'
+-      }`}
++      className={`h-6 w-6 shrink-0 rounded-full border ${ring}`}
+     />
+   );
+ }
+diff --git a/src/layouts/Base.astro b/src/layouts/Base.astro
+index 82cb68a..06fe157 100644
+--- a/src/layouts/Base.astro
++++ b/src/layouts/Base.astro
+@@ -1,5 +1,6 @@
+ ---
+ import '../styles/global.css';
++import { CITIES } from '../lib/time/cities';
+ 
+ interface Props {
+   title: string;
+@@ -12,6 +13,49 @@ const { title, description, path, image } = Astro.props;
+ const origin = Astro.site ?? Astro.url.origin;
+ const canonical = new URL(path ?? Astro.url.pathname, origin);
+ const ogImage = new URL(image ?? '/og.png', origin);
++
++/** Current path, normalised without a trailing slash, for marking the active nav item. */
++const here = (path ?? Astro.url.pathname).replace(/\/+$/, '') || '/';
++
++const navLinks = [
++  { href: '/', label: 'World clock', shortLabel: 'Clock' },
++  { href: '/overlap', label: 'Meeting planner', shortLabel: 'Planner' },
++];
++
++/*
++ * Footer links are derived from the city data rather than hand-written, because
++ * hand-writing them is exactly what produced dead links the first time round:
++ * a pair page only exists between two hubs in different zones, in alphabetical
++ * slug order. Resolving them here means a typo or a dataset change cannot ship
++ * a 404 in the footer of all 642 pages.
++ */
++const bySlug = new Map(CITIES.map((c) => [c.slug, c]));
++
++const footerCitySlugs = ['london', 'new-york', 'tokyo', 'sydney', 'singapore', 'los-angeles'];
++const footerCities = footerCitySlugs.map((s) => bySlug.get(s)).filter((c) => c !== undefined);
++
++const footerPairSlugs: Array<[string, string]> = [
++  ['london', 'new-york'],
++  ['london', 'sydney'],
++  ['new-york', 'tokyo'],
++  ['london', 'tokyo'],
++  ['london', 'los-angeles'],
++  ['new-york', 'singapore'],
++];
++
++const footerPairs = footerPairSlugs
++  .map(([x, y]) => {
++    const a = bySlug.get(x);
++    const b = bySlug.get(y);
++    // Same conditions as hubPairs(): both hubs, different zones.
++    if (!a || !b || !a.isHub || !b.isHub || a.timeZone === b.timeZone) return null;
++    const [first, second] = a.slug < b.slug ? [a, b] : [b, a];
++    return {
++      href: `/difference/${first.slug}/${second.slug}`,
++      label: `${first.name} / ${second.name}`,
++    };
++  })
++  .filter((p) => p !== null);
+ ---
+ 
+ <!doctype html>
+@@ -87,58 +131,193 @@ const ogImage = new URL(image ?? '/og.png', origin);
+       Skip to content
+     </a>
+ 
+-    <header class="mx-auto max-w-4xl px-4 pt-6 sm:pt-8">
+-      <a
+-        href="/"
+-        class="ring-focus inline-block rounded text-base font-semibold tracking-tight text-paper-900 hover:text-paper-700"
++    <header class="sticky top-0 z-40 border-b border-paper-200/80 bg-paper-50/88 backdrop-blur-xl">
++      <div
++        class="mx-auto flex h-[4.25rem] max-w-6xl items-center justify-between gap-3 px-5 sm:px-8"
+       >
+-        Hours Apart
+-      </a>
++        <a
++          href="/"
++          class="ring-focus flex min-w-0 items-center gap-2.5 rounded-lg"
++          aria-label="Hours Apart, home"
++        >
++          <span
++            class="brand-mark flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border border-paper-200 elev"
++            aria-hidden="true"
++          >
++            <svg width="22" height="22" viewBox="0 0 32 32">
++              <circle cx="13" cy="16" r="7.2" fill="none" stroke="currentColor" stroke-width="2"
++              ></circle>
++              <circle cx="19" cy="16" r="7.2" fill="none" stroke="currentColor" stroke-width="2"
++              ></circle>
++              <path d="M16 9.5a7.2 7.2 0 0 0 0 13 7.2 7.2 0 0 0 0-13Z" fill="var(--color-go-500)"
++              ></path>
++            </svg>
++          </span>
++          <span class="truncate text-[15px] font-semibold tracking-tight text-paper-900"
++            >Hours Apart</span
++          >
++          <span class="hidden border-l border-paper-200 pl-3 text-[11px] text-paper-500 lg:inline"
++            >World time, made human</span
++          >
++        </a>
++
++        <nav
++          aria-label="Main"
++          class="flex shrink-0 items-center gap-0.5 rounded-xl border border-paper-200 bg-white/75 p-1 text-sm elev"
++        >
++          {
++            navLinks.map((link) => {
++              const active = here === link.href;
++              return (
++                <a
++                  href={link.href}
++                  aria-current={active ? 'page' : undefined}
++                  class:list={[
++                    'ring-focus rounded-lg px-3 py-1.5 font-medium transition-colors',
++                    active
++                      ? 'bg-paper-900 text-paper-50'
++                      : 'text-paper-500 hover:bg-paper-100 hover:text-paper-900',
++                  ]}
++                >
++                  <span class="sm:hidden">{link.shortLabel}</span>
++                  <span class="hidden sm:inline">{link.label}</span>
++                </a>
++              );
++            })
++          }
++        </nav>
++      </div>
+     </header>
+ 
+-    <main id="main" class="mx-auto max-w-4xl px-4 py-8 sm:py-12">
++    <main id="main" class="mx-auto max-w-6xl px-5 py-8 sm:px-8 sm:py-12">
+       <slot />
+     </main>
+ 
+-    <footer class="mx-auto mt-20 max-w-4xl px-4 pb-10 text-xs leading-relaxed text-paper-500">
+-      <p class="max-w-2xl">
+-        Time zone data comes from your own device's IANA database, so it is as current as your
+-        browser. Nothing you enter is uploaded &mdash; the whole scenario lives in the link.
+-      </p>
+-
+-      <div class="mt-5 flex flex-wrap items-center gap-1.5">
+-        <span id="sky-label" class="mr-1">Theme</span>
+-        <div role="group" aria-labelledby="sky-label" class="flex gap-1">
+-          <button
+-            type="button"
+-            data-sky-mode="auto"
+-            class="ring-focus rounded-md border border-paper-200 px-2 py-1 hover:text-paper-900"
+-          >
+-            Follow my sky
+-          </button>
+-          <button
+-            type="button"
+-            data-sky-mode="light"
+-            class="ring-focus rounded-md border border-paper-200 px-2 py-1 hover:text-paper-900"
+-          >
+-            Light
+-          </button>
+-          <button
+-            type="button"
+-            data-sky-mode="dark"
+-            class="ring-focus rounded-md border border-paper-200 px-2 py-1 hover:text-paper-900"
+-          >
+-            Dark
+-          </button>
++    <footer class="mt-24 border-t border-paper-200">
++      <div class="mx-auto max-w-6xl px-5 py-14 sm:px-8">
++        <div class="grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
++          <div class="sm:col-span-2 lg:col-span-1">
++            <div class="flex items-center gap-2">
++              <svg width="20" height="20" viewBox="0 0 32 32" aria-hidden="true">
++                <circle cx="13" cy="16" r="7.2" fill="none" stroke="currentColor" stroke-width="2"
++                ></circle>
++                <circle cx="19" cy="16" r="7.2" fill="none" stroke="currentColor" stroke-width="2"
++                ></circle>
++                <path d="M16 9.5a7.2 7.2 0 0 0 0 13 7.2 7.2 0 0 0 0-13Z" fill="var(--color-go-500)"
++                ></path>
++              </svg>
++              <span class="text-sm font-semibold tracking-tight text-paper-900">Hours Apart</span>
++            </div>
++            <p class="mt-3 text-xs leading-relaxed text-paper-500">
++              A world clock that tells you whether it is light there, and warns you before daylight
++              saving moves a recurring meeting.
++            </p>
++          </div>
++
++          <div>
++            <h2 class="text-xs font-semibold tracking-wide text-paper-900 uppercase">Tools</h2>
++            <ul class="mt-3 space-y-2 text-sm">
++              <li>
++                <a href="/" class="ring-focus rounded text-paper-700 hover:text-paper-900">
++                  World clock
++                </a>
++              </li>
++              <li>
++                <a href="/overlap" class="ring-focus rounded text-paper-700 hover:text-paper-900">
++                  Meeting planner
++                </a>
++              </li>
++              <li>
++                <a href="/privacy" class="ring-focus rounded text-paper-700 hover:text-paper-900">
++                  Privacy
++                </a>
++              </li>
++              <li>
++                <a href="/contact" class="ring-focus rounded text-paper-700 hover:text-paper-900">
++                  Contact &amp; feedback
++                </a>
++              </li>
++            </ul>
++          </div>
++
++          <div>
++            <h2 class="text-xs font-semibold tracking-wide text-paper-900 uppercase">
++              Popular cities
++            </h2>
++            <ul class="mt-3 space-y-2 text-sm">
++              {
++                footerCities.map((city) => (
++                  <li>
++                    <a
++                      href={`/time/${city.slug}`}
++                      class="ring-focus rounded text-paper-700 hover:text-paper-900"
++                    >
++                      Time in {city.name}
++                    </a>
++                  </li>
++                ))
++              }
++            </ul>
++          </div>
++
++          <div>
++            <h2 class="text-xs font-semibold tracking-wide text-paper-900 uppercase">
++              Time differences
++            </h2>
++            <ul class="mt-3 space-y-2 text-sm">
++              {
++                footerPairs.map((pair) => (
++                  <li>
++                    <a
++                      href={pair.href}
++                      class="ring-focus rounded text-paper-700 hover:text-paper-900"
++                    >
++                      {pair.label}
++                    </a>
++                  </li>
++                ))
++              }
++            </ul>
++          </div>
+         </div>
+-        <span id="sky-state" class="ml-1 opacity-70"></span>
+-      </div>
+ 
+-      <nav aria-label="Footer" class="mt-5 flex flex-wrap gap-x-4 gap-y-1">
+-        <a href="/" class="ring-focus rounded hover:text-paper-900">World clock</a>
+-        <a href="/overlap" class="ring-focus rounded hover:text-paper-900">Meeting planner</a>
+-        <a href="/privacy" class="ring-focus rounded hover:text-paper-900">Privacy</a>
+-      </nav>
++        <div
++          class="mt-10 flex flex-col gap-4 border-t border-paper-200 pt-6 text-xs leading-relaxed text-paper-500 sm:flex-row sm:items-start sm:justify-between"
++        >
++          <p class="max-w-md">
++            Time zone data comes from your own device's IANA database, so it is as current as your
++            browser. Nothing you enter is uploaded &mdash; the whole scenario lives in the link.
++          </p>
++
++          <div class="flex flex-wrap items-center gap-1.5 sm:justify-end">
++            <span id="sky-label" class="mr-1">Theme</span>
++            <div role="group" aria-labelledby="sky-label" class="flex gap-1">
++              <button
++                type="button"
++                data-sky-mode="auto"
++                class="ring-focus rounded-md border border-paper-200 px-2 py-1 hover:text-paper-900"
++              >
++                Follow my sky
++              </button>
++              <button
++                type="button"
++                data-sky-mode="light"
++                class="ring-focus rounded-md border border-paper-200 px-2 py-1 hover:text-paper-900"
++              >
++                Light
++              </button>
++              <button
++                type="button"
++                data-sky-mode="dark"
++                class="ring-focus rounded-md border border-paper-200 px-2 py-1 hover:text-paper-900"
++              >
++                Dark
++              </button>
++            </div>
++            <span id="sky-state" class="ml-1 w-full opacity-70 sm:w-auto"></span>
++          </div>
++        </div>
++      </div>
+     </footer>
+ 
+     <script>
+diff --git a/src/lib/time/share.test.ts b/src/lib/time/share.test.ts
+index 1c4cdf3..e6a7a2f 100644
+--- a/src/lib/time/share.test.ts
++++ b/src/lib/time/share.test.ts
+@@ -1,5 +1,5 @@
+ import { describe, expect, it } from 'vitest';
+-import { decodeScenario, encodeScenario, type Scenario } from './share';
++import { DEFAULT_MEETING_DURATION, decodeScenario, encodeScenario, type Scenario } from './share';
+ import { DEFAULT_WORK_DAYS, type Participant } from './overlap';
+ import {
+   CITIES,
+@@ -33,6 +33,7 @@ describe('scenario links', () => {
+     ],
+     anchorIndex: 1,
+     meetingMinutes: 9 * 60,
++    durationMinutes: 90,
+     date: '2026-12-25',
+   };
+ 
+@@ -42,6 +43,7 @@ describe('scenario links', () => {
+     expect(decoded.participants).toHaveLength(3);
+     expect(decoded.anchorIndex).toBe(1);
+     expect(decoded.meetingMinutes).toBe(540);
++    expect(decoded.durationMinutes).toBe(90);
+     expect(decoded.date).toBe('2026-12-25');
+     expect(decoded.participants[0].timeZone).toBe('Australia/Sydney');
+     expect(decoded.participants[1].workStart).toBe(8 * 60 + 30);
+@@ -62,6 +64,7 @@ describe('scenario links', () => {
+       ],
+       anchorIndex: 0,
+       meetingMinutes: null,
++      durationMinutes: DEFAULT_MEETING_DURATION,
+       date: null,
+     });
+ 
+@@ -116,13 +119,32 @@ describe('scenario links', () => {
+     }
+   });
+ 
+-  it('reads links made before dates existed', () => {
++  it('reads links made before dates and durations existed', () => {
+     const decoded = decodeScenario(
+       '?p=Australia/Sydney-540-1020-12345_Europe/London-540-1020-12345&a=0&m=540',
+     )!;
+     expect(decoded.participants).toHaveLength(2);
+     expect(decoded.date).toBeNull();
+     expect(decoded.meetingMinutes).toBe(540);
++    expect(decoded.durationMinutes).toBe(DEFAULT_MEETING_DURATION);
++  });
++
++  it('omits the default duration and round-trips supported durations', () => {
++    expect(
++      encodeScenario({ ...scenario, durationMinutes: DEFAULT_MEETING_DURATION }),
++    ).not.toContain('l=');
++
++    for (const durationMinutes of [30, 60, 90, 120] as const) {
++      const encoded = encodeScenario({ ...scenario, durationMinutes });
++      expect(decodeScenario(`?${encoded}`)!.durationMinutes).toBe(durationMinutes);
++    }
++  });
++
++  it('falls back to 30 minutes for unsupported or malformed durations', () => {
++    for (const bad of ['0', '45', '180', 'junk']) {
++      const decoded = decodeScenario(`?p=Asia/Tokyo-540-1020-12345&l=${bad}`)!;
++      expect(decoded.durationMinutes, bad).toBe(DEFAULT_MEETING_DURATION);
++    }
+   });
+ });
+ 
+diff --git a/src/lib/time/share.ts b/src/lib/time/share.ts
+index 901c468..4f4e182 100644
+--- a/src/lib/time/share.ts
++++ b/src/lib/time/share.ts
+@@ -25,12 +25,18 @@ import { labelForTimeZone } from './cities';
+ const SEP_PERSON = '_';
+ const SEP_FIELD = '-';
+ 
++export const MEETING_DURATIONS = [30, 60, 90, 120] as const;
++export type MeetingDuration = (typeof MEETING_DURATIONS)[number];
++export const DEFAULT_MEETING_DURATION: MeetingDuration = 30;
++
+ export interface Scenario {
+   participants: Participant[];
+   /** Index into `participants` whose local clock the meeting is pinned to. */
+   anchorIndex: number;
+   /** Proposed meeting time in the anchor's local minutes, if one was chosen. */
+   meetingMinutes: number | null;
++  /** Length of the proposed meeting. Restricted to the planner's 30-minute grid. */
++  durationMinutes: MeetingDuration;
+   /**
+    * Calendar day being inspected, in the anchor's zone, as `YYYY-MM-DD`.
+    *
+@@ -61,6 +67,9 @@ export function encodeScenario(scenario: Scenario): string {
+ 
+   if (scenario.anchorIndex > 0) params.set('a', String(scenario.anchorIndex));
+   if (scenario.meetingMinutes !== null) params.set('m', String(scenario.meetingMinutes));
++  if (scenario.durationMinutes !== DEFAULT_MEETING_DURATION) {
++    params.set('l', String(scenario.durationMinutes));
++  }
+   if (scenario.date !== null) params.set('d', scenario.date);
+ 
+   return params.toString();
+@@ -126,10 +135,15 @@ export function decodeScenario(search: string): Scenario | null {
+       ? Math.round(meetingParsed)
+       : null;
+ 
++  const durationRaw = Number(params.get('l'));
++  const durationMinutes = MEETING_DURATIONS.includes(durationRaw as MeetingDuration)
++    ? (durationRaw as MeetingDuration)
++    : DEFAULT_MEETING_DURATION;
++
+   const dateRaw = params.get('d');
+   const date = dateRaw !== null && isValidIsoDate(dateRaw) ? dateRaw : null;
+ 
+-  return { participants, anchorIndex, meetingMinutes, date };
++  return { participants, anchorIndex, meetingMinutes, durationMinutes, date };
+ }
+ 
+ function clampMinutes(value: number, fallback: number): number {
+diff --git a/src/lib/time/useScenario.ts b/src/lib/time/useScenario.ts
+index 58f2064..fbec520 100644
+--- a/src/lib/time/useScenario.ts
++++ b/src/lib/time/useScenario.ts
+@@ -5,7 +5,12 @@ import {
+   DEFAULT_WORK_START,
+   type Participant,
+ } from './overlap';
+-import { decodeScenario, encodeScenario } from './share';
++import {
++  DEFAULT_MEETING_DURATION,
++  decodeScenario,
++  encodeScenario,
++  type MeetingDuration,
++} from './share';
+ import { labelForTimeZone } from './cities';
+ import { localTimeZone } from './zone';
+ 
+@@ -50,6 +55,7 @@ export interface ScenarioState {
+   anchorIndex: number;
+   anchor: Participant;
+   meetingMinutes: number | null;
++  durationMinutes: MeetingDuration;
+   /** Calendar day in the anchor's zone, or `null` for "today, live". */
+   date: string | null;
+   /** Current scenario as a query string, for cross-view links and sharing. */
+@@ -62,6 +68,7 @@ export interface ScenarioState {
+   move: (id: string, direction: -1 | 1) => void;
+   setAnchor: (index: number) => void;
+   setMeetingMinutes: (minutes: number | null) => void;
++  setDurationMinutes: (minutes: MeetingDuration) => void;
+   setDate: (date: string | null) => void;
+ }
+ 
+@@ -69,6 +76,7 @@ export function useScenario(): ScenarioState {
+   const [participants, setParticipants] = useState<Participant[]>(seed);
+   const [anchorIndex, setAnchorIndex] = useState(0);
+   const [meetingMinutes, setMeetingMinutes] = useState<number | null>(null);
++  const [durationMinutes, setDurationMinutes] = useState<MeetingDuration>(DEFAULT_MEETING_DURATION);
+   const [date, setDate] = useState<string | null>(null);
+   const [hydrated, setHydrated] = useState(false);
+ 
+@@ -80,6 +88,7 @@ export function useScenario(): ScenarioState {
+       setParticipants(shared.participants);
+       setAnchorIndex(shared.anchorIndex);
+       setMeetingMinutes(shared.meetingMinutes);
++      setDurationMinutes(shared.durationMinutes);
+       setDate(shared.date);
+     }
+     setHydrated(true);
+@@ -87,8 +96,15 @@ export function useScenario(): ScenarioState {
+ 
+   const safeAnchorIndex = Math.min(anchorIndex, Math.max(0, participants.length - 1));
+   const query = useMemo(
+-    () => encodeScenario({ participants, anchorIndex: safeAnchorIndex, meetingMinutes, date }),
+-    [participants, safeAnchorIndex, meetingMinutes, date],
++    () =>
++      encodeScenario({
++        participants,
++        anchorIndex: safeAnchorIndex,
++        meetingMinutes,
++        durationMinutes,
++        date,
++      }),
++    [participants, safeAnchorIndex, meetingMinutes, durationMinutes, date],
+   );
+ 
+   // Mirror state into the address bar so a reload, a bookmark or a copied URL
+@@ -131,6 +147,7 @@ export function useScenario(): ScenarioState {
+     anchorIndex: safeAnchorIndex,
+     anchor: participants[safeAnchorIndex] ?? participants[0],
+     meetingMinutes,
++    durationMinutes,
+     date,
+     query,
+     hydrated,
+@@ -140,6 +157,7 @@ export function useScenario(): ScenarioState {
+     move,
+     setAnchor: setAnchorIndex,
+     setMeetingMinutes,
++    setDurationMinutes,
+     setDate,
+   };
+ }
+diff --git a/src/pages/difference/[a]/[b].astro b/src/pages/difference/[a]/[b].astro
+index 5a4e86e..6a6d49a 100644
+--- a/src/pages/difference/[a]/[b].astro
++++ b/src/pages/difference/[a]/[b].astro
+@@ -1,6 +1,7 @@
+ ---
+ import Base from '../../../layouts/Base.astro';
+ import PairClock from '../../../components/PairClock.tsx';
++import Faq from '../../../components/Faq.astro';
+ import { hubPairs, type City } from '../../../lib/time/cities';
+ import {
+   convertTime,
+@@ -63,7 +64,7 @@ const title = diff.varies
+ 
+ const description = diff.varies
+   ? `${b.name} is ${gapWord} from ${a.name}. The difference is not fixed: it changes ${spans.length - 1} times a year because the two places move their clocks on different weekends. Exact dates and a converter for any date.`
+-  : `${b.name} is ${formatGap(diff.gapAtStart)} than ${a.name}, and unlike most city pairs this gap stays the same all year. Convert any time on any date.`;
++  : `${b.name} is ${formatGap(diff.gapAtStart)} relative to ${a.name}, and unlike most city pairs this gap stays the same all year. Convert any time on any date.`;
+ 
+ const seedQuery = `p=${a.timeZone}-540-1020-12345_${b.timeZone}-540-1020-12345`;
+ 
+@@ -71,8 +72,8 @@ const faqs = [
+   {
+     q: `What is the time difference between ${a.name} and ${b.name}?`,
+     a: diff.varies
+-      ? `There is no single answer, which is why most converters get this wrong for part of the year. ${b.name} is ${diff.distinctGaps.map((g) => formatGap(g)).join(', ')} than ${a.name} at different points in the year. Right now it is ${formatGap(diff.gapAtStart)}. The table on this page gives the exact dates for each.`
+-      : `${b.name} is ${formatGap(diff.gapAtStart)} than ${a.name}, and this pair is unusual in that the gap does not change during the year.`,
++      ? `There is no single answer, which is why most converters get this wrong for part of the year. ${b.name} is ${diff.distinctGaps.map((g) => formatGap(g)).join(', ')} relative to ${a.name} at different points in the year. Right now it is ${formatGap(diff.gapAtStart)}. The table on this page gives the exact dates for each.`
++      : `${b.name} is ${formatGap(diff.gapAtStart)} relative to ${a.name}, and this pair is unusual in that the gap does not change during the year.`,
+   },
+   {
+     q: `Why does the difference between ${a.name} and ${b.name} change?`,
+@@ -107,7 +108,7 @@ const faqs = [
+     ? [
+         {
+           q: `When is the difference between ${a.name} and ${b.name} unusual?`,
+-          a: `The shortest window runs from ${formatIsoDateLong(diff.shortestSpan.from)} to ${formatIsoDateLong(diff.shortestSpan.to)} — ${diff.shortestSpan.days} day${diff.shortestSpan.days === 1 ? '' : 's'} during which ${b.name} is ${formatGap(diff.shortestSpan.gapMinutes)} than ${a.name} rather than the usual amount. Short windows like this are where recurring meetings break, because nobody thinks to check.`,
++          a: `The shortest window runs from ${formatIsoDateLong(diff.shortestSpan.from)} to ${formatIsoDateLong(diff.shortestSpan.to)} — ${diff.shortestSpan.days} day${diff.shortestSpan.days === 1 ? '' : 's'} during which ${b.name} is ${formatGap(diff.shortestSpan.gapMinutes)} relative to ${a.name} rather than the usual amount. Short windows like this are where recurring meetings break, because nobody thinks to check.`,
+         },
+       ]
+     : []),
+@@ -156,8 +157,8 @@ const faqs = [
+           </>
+         ) : (
+           <>
+-            {b.name} is {formatGap(diff.gapAtStart)} than {a.name}, and this pair is unusual: the
+-            gap holds steady all year.
++            {b.name} is {formatGap(diff.gapAtStart)} relative to {a.name}, and this pair is unusual:
++            the gap holds steady all year.
+           </>
+         )
+       }
+@@ -182,13 +183,13 @@ const faqs = [
+           which the difference is a particular number. Dates are {a.name}'s local dates.
+         </p>
+ 
+-        <div class="mt-4 overflow-x-auto rounded-xl border border-paper-200 bg-white">
+-          <table class="w-full text-sm">
++        <div class="mt-4 overflow-hidden overflow-x-auto rounded-xl border border-paper-200 bg-white elev">
++          <table class="data-table responsive-table spans-table w-full text-sm">
+             <caption class="sr-only">
+               Time difference between {a.name} and {b.name} by date range
+             </caption>
+             <thead>
+-              <tr class="border-b border-paper-100 text-left text-xs text-paper-500">
++              <tr class="border-b border-paper-200 text-left text-xs font-medium text-paper-700">
+                 <th scope="col" class="px-3 py-2 font-medium">
+                   From
+                 </th>
+@@ -247,11 +248,13 @@ const faqs = [
+       the table of gaps says the difference changes, these numbers change with it.
+     </p>
+ 
+-    <div class="mt-4 overflow-x-auto rounded-xl border border-paper-200 bg-white">
+-      <table class="w-full text-sm">
++    <div
++      class="mt-4 overflow-hidden overflow-x-auto rounded-xl border border-paper-200 bg-white elev"
++    >
++      <table class="data-table responsive-table conversion-table w-full text-sm">
+         <caption class="sr-only">Hourly conversion from {a.name} to {b.name}</caption>
+         <thead>
+-          <tr class="border-b border-paper-100 text-left text-xs text-paper-500">
++          <tr class="border-b border-paper-200 text-left text-xs font-medium text-paper-700">
+             <th scope="col" class="px-3 py-2 font-medium">{a.name}</th>
+             <th scope="col" class="px-3 py-2 font-medium">{b.name}</th>
+           </tr>
+@@ -334,17 +337,5 @@ const faqs = [
+   </section>
+ 
+   <!-- ------------------------------------------------------------------- faq -->
+-  <section class="mt-14 max-w-2xl">
+-    <h2 class="text-xl font-semibold tracking-tight">Questions</h2>
+-    <dl class="mt-5 space-y-6">
+-      {
+-        faqs.map((f) => (
+-          <div>
+-            <dt class="text-sm font-medium">{f.q}</dt>
+-            <dd class="mt-1.5 text-sm leading-relaxed text-paper-700">{f.a}</dd>
+-          </div>
+-        ))
+-      }
+-    </dl>
+-  </section>
++  <Faq faqs={faqs} heading={`${a.name} and ${b.name}, explained`} />
+ </Base>
+diff --git a/src/pages/index.astro b/src/pages/index.astro
+index 2c52fb3..110e43f 100644
+--- a/src/pages/index.astro
++++ b/src/pages/index.astro
+@@ -1,6 +1,7 @@
+ ---
+ import Base from '../layouts/Base.astro';
+ import WorldClock from '../components/WorldClock.tsx';
++import Faq from '../components/Faq.astro';
+ 
+ const title = 'World Clock — current time in every city, and whether it is dark there';
+ const description =
+@@ -45,41 +46,192 @@ const faqs = [
+     })}
+   />
+ 
+-  <header class="mb-7 max-w-2xl">
+-    <h1 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">World clock</h1>
+-    <p class="mt-3 text-paper-700">
+-      Current time in the cities you care about, with the one thing other clocks leave out &mdash;
+-      whether it is actually light there. Drag the slider to try a different hour.
+-    </p>
+-  </header>
+-
+-  <WorldClock client:load />
+-
+-  <section class="mt-20 max-w-2xl">
+-    <h2 class="text-xl font-semibold tracking-tight">Why the daylight bar matters</h2>
+-    <p class="mt-3 text-sm leading-relaxed text-paper-700">
+-      "It is 16:00 in Stockholm" is a fact with almost no useful content. In June that is the middle
+-      of a long bright evening; in December the sun set an hour ago. The number is identical and the
+-      answer to "should I call now" is the opposite.
+-    </p>
+-    <p class="mt-3 text-sm leading-relaxed text-paper-700">
+-      That is why every city here carries its own latitude rather than borrowing one from its time
+-      zone. Miami and Boston both run on <span class="whitespace-nowrap">America/New_York</span>,
+-      yet in midwinter the sun is still up in one and long gone in the other.
+-    </p>
+-  </section>
++  <section class="home-hero relative pb-10 sm:pb-14">
++    <div
++      class="grid items-center gap-9 lg:grid-cols-[minmax(0,1.05fr)_minmax(24rem,0.95fr)] lg:gap-14"
++    >
++      <div>
++        <p
++          class="inline-flex items-center gap-2 rounded-full border border-paper-200 bg-white/80 px-3 py-1.5 text-xs font-medium text-paper-700 elev"
++        >
++          <span class="relative flex h-1.5 w-1.5" aria-hidden="true">
++            <span
++              class="absolute inline-flex h-full w-full animate-ping rounded-full bg-go-500 opacity-60"
++            ></span>
++            <span class="relative inline-flex h-1.5 w-1.5 rounded-full bg-go-500"></span>
++          </span>
++          Live world time &middot; private by design
++        </p>
++
++        <h1
++          class="mt-5 max-w-3xl text-[2.75rem] leading-[0.98] font-semibold tracking-[-0.045em] text-balance sm:text-6xl lg:text-[4.1rem]"
++        >
++          What time is it there &mdash;
++          <span class="text-paper-500">and is the sun up?</span>
++        </h1>
++
++        <p class="mt-5 max-w-xl text-lg leading-relaxed text-paper-700 sm:text-xl">
++          See everyone&rsquo;s local time, daylight and date in one calm view. Then choose a future
++          hour without getting caught by daylight saving.
++        </p>
++
++        <div class="mt-7 flex flex-wrap items-center gap-3">
++          <a
++            href="#clock"
++            class="ring-focus elev elev-hover rounded-xl bg-paper-900 px-5 py-3 text-sm font-semibold text-paper-50"
++          >
++            Open my world clock
++          </a>
++          <a
++            href="/overlap"
++            class="ring-focus rounded-xl border border-paper-200 bg-white/80 px-5 py-3 text-sm font-semibold text-paper-900 elev hover:border-paper-300"
++          >
++            Find an overlap <span aria-hidden="true">&rarr;</span>
++          </a>
++        </div>
++
++        <p class="mt-5 text-xs leading-relaxed text-paper-500">
++          112 cities with real latitudes <span aria-hidden="true">&middot;</span> no account
++          <span aria-hidden="true">&middot;</span> every setup is a shareable link
++        </p>
++      </div>
++
++      <aside
++        class="hero-preview relative hidden overflow-hidden rounded-[1.75rem] border border-paper-200 bg-white p-6 elev-lift lg:block"
++        aria-label="Example daylight saving change between London and Sydney"
++      >
++        <div class="relative z-10">
++          <div class="flex items-center justify-between gap-3">
++            <p class="text-[11px] font-semibold tracking-[0.16em] text-paper-500 uppercase">
++              DST watch
++            </p>
++            <span
++              class="rounded-full bg-warn-100 px-2.5 py-1 text-[10px] font-semibold text-warn-700"
++              >Gap changes</span
++            >
++          </div>
++
++          <div class="mt-7 grid grid-cols-[1fr_auto_1fr] items-center gap-4">
++            <div>
++              <p class="text-sm font-semibold">London</p>
++              <p class="nums mt-1 text-3xl font-semibold tracking-tight">09:00</p>
++              <p class="mt-1 text-xs text-paper-500">workday begins</p>
++            </div>
++            <div class="flex flex-col items-center" aria-hidden="true">
++              <span class="h-2 w-2 rounded-full bg-go-500"></span>
++              <span class="h-12 w-px bg-paper-200"></span>
++              <span class="h-2 w-2 rounded-full bg-sky-day"></span>
++            </div>
++            <div class="text-right">
++              <p class="text-sm font-semibold">Sydney</p>
++              <p class="nums mt-1 text-3xl font-semibold tracking-tight">18:00</p>
++              <p class="mt-1 text-xs text-paper-500">same moment</p>
++            </div>
++          </div>
+ 
+-  <section class="mt-12 max-w-2xl">
+-    <h2 class="text-xl font-semibold tracking-tight">Questions</h2>
+-    <dl class="mt-5 space-y-6">
+-      {
+-        faqs.map((f) => (
+-          <div>
+-            <dt class="text-sm font-medium">{f.q}</dt>
+-            <dd class="mt-1.5 text-sm leading-relaxed text-paper-700">{f.a}</dd>
++          <div class="mt-7 rounded-2xl border border-paper-200 bg-paper-50/80 p-4">
++            <div class="flex items-center justify-between gap-3 text-xs text-paper-500">
++              <span>Across one year</span>
++              <span>not one fixed gap</span>
++            </div>
++            <div class="mt-3 grid grid-cols-3 gap-2">
++              <div class="rounded-xl border border-paper-200 bg-white px-3 py-2.5 text-center">
++                <span class="nums block text-lg font-semibold">9h</span>
++                <span class="text-[10px] text-paper-500">apart</span>
++              </div>
++              <div class="rounded-xl border border-warn-400/50 bg-warn-100 px-3 py-2.5 text-center">
++                <span class="nums block text-lg font-semibold">10h</span>
++                <span class="text-[10px] text-warn-700">apart</span>
++              </div>
++              <div class="rounded-xl border border-paper-200 bg-white px-3 py-2.5 text-center">
++                <span class="nums block text-lg font-semibold">11h</span>
++                <span class="text-[10px] text-paper-500">apart</span>
++              </div>
++            </div>
+           </div>
+-        ))
+-      }
+-    </dl>
++        </div>
++      </aside>
++    </div>
++  </section>
++
++  <section id="clock" class="scroll-mt-24 border-t border-paper-200 pt-8 sm:pt-10">
++    <div class="mb-5 flex flex-wrap items-end justify-between gap-3">
++      <div>
++        <p class="text-[11px] font-semibold tracking-[0.16em] text-paper-500 uppercase">
++          Your live workspace
++        </p>
++        <h2 class="mt-1.5 text-2xl font-semibold tracking-tight sm:text-3xl">
++          Everyone, at the same moment
++        </h2>
++      </div>
++      <p class="hidden max-w-xs text-right text-xs leading-relaxed text-paper-500 sm:block">
++        Drag the time, change the date, rename cities and share the exact view.
++      </p>
++    </div>
++
++    <WorldClock client:load />
+   </section>
++
++  <section class="mt-24 sm:mt-32">
++    <p class="text-xs font-semibold tracking-widest text-paper-500 uppercase">The difference</p>
++    <div class="mt-4 grid gap-10 lg:grid-cols-[1.1fr_1fr] lg:gap-16">
++      <div>
++        <h2 class="text-2xl font-semibold tracking-tight text-balance sm:text-3xl">
++          A time on its own does not tell you whether to call
++        </h2>
++        <p class="mt-4 leading-relaxed text-paper-700">
++          &ldquo;It is 16:00 in Stockholm&rdquo; is a fact with almost no useful content. In June
++          that is the middle of a long bright evening; in December the sun set an hour ago. The
++          number is identical and the answer is the opposite.
++        </p>
++        <p class="mt-4 leading-relaxed text-paper-700">
++          So every city here carries its own latitude rather than borrowing one from its time zone.
++          Miami and Boston both run on <span class="whitespace-nowrap">America/New_York</span>, yet
++          in midwinter the sun is still up in one and long gone in the other.
++        </p>
++      </div>
++
++      {/* The same clock time in two months, shown rather than described. */}
++      <div
++        class="elev flex flex-col justify-center gap-6 rounded-2xl border border-paper-200 bg-white p-6"
++      >
++        {
++          [
++            {
++              month: 'Stockholm in June',
++              note: 'Sun still high. Hours of light left.',
++              stops:
++                'var(--color-sky-day) 0%, var(--color-sky-day) 80%, var(--color-sky-dusk) 92%, var(--color-sky-night) 100%',
++            },
++            {
++              month: 'Stockholm in December',
++              note: 'Set an hour ago. Fully dark.',
++              stops:
++                'var(--color-sky-night) 0%, var(--color-sky-night) 30%, var(--color-sky-dusk) 36%, var(--color-sky-day) 42%, var(--color-sky-day) 56%, var(--color-sky-dusk) 62%, var(--color-sky-night) 68%, var(--color-sky-night) 100%',
++            },
++          ].map((row) => (
++            <div>
++              <div class="flex items-baseline justify-between gap-3">
++                <span class="text-sm font-medium">{row.month}</span>
++                <span class="nums text-lg font-semibold">16:00</span>
++              </div>
++              <div
++                class="sky-strip relative mt-2.5 h-2.5 overflow-hidden rounded-full"
++                style={`--sky-stops: ${row.stops}`}
++                aria-hidden="true"
++              >
++                <div
++                  class="sky-marker absolute top-0 h-full w-0.5 rounded-full bg-paper-900"
++                  style="left: calc(66.6% - 1px)"
++                />
++              </div>
++              <p class="mt-2.5 text-xs text-paper-500">{row.note}</p>
++            </div>
++          ))
++        }
++      </div>
++    </div>
++  </section>
++
++  <Faq faqs={faqs} />
+ </Base>
+diff --git a/src/pages/overlap.astro b/src/pages/overlap.astro
+index 37382f9..46c6a09 100644
+--- a/src/pages/overlap.astro
++++ b/src/pages/overlap.astro
+@@ -1,6 +1,7 @@
+ ---
+ import Base from '../layouts/Base.astro';
+ import TeamPlanner from '../components/TeamPlanner.tsx';
++import Faq from '../components/Faq.astro';
+ 
+ const title = 'Meeting time finder — overlapping working hours across time zones';
+ const description =
+@@ -45,13 +46,23 @@ const faqs = [
+     })}
+   />
+ 
+-  <header class="mb-7 max-w-2xl">
+-    <h1 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+-      When is everyone free?
++  <header class="mb-9">
++    <p
++      class="inline-flex items-center gap-1.5 rounded-full border border-paper-200 bg-white px-3 py-1 text-xs font-medium text-paper-700 elev"
++    >
++      <span class="h-2 w-2 rounded-full bg-go-500" aria-hidden="true"></span>
++      Overlapping working hours
++    </p>
++
++    <h1
++      class="mt-4 max-w-3xl text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-5xl"
++    >
++      When is everyone actually free?
+     </h1>
+-    <p class="mt-3 text-paper-700">
+-      Set each person's working hours and days. The grid shows the hours that suit everybody &mdash;
+-      and, once you pick one, every daylight saving date that will quietly move it.
++
++    <p class="mt-4 max-w-2xl text-lg leading-relaxed text-paper-700">
++      Set each person's hours and days. The grid shows the time that suits everybody &mdash; then
++      names every daylight saving date that will quietly move it out from under you.
+     </p>
+   </header>
+ 
+@@ -72,17 +83,5 @@ const faqs = [
+     </p>
+   </section>
+ 
+-  <section class="mt-12 max-w-2xl">
+-    <h2 class="text-xl font-semibold tracking-tight">Questions</h2>
+-    <dl class="mt-5 space-y-6">
+-      {
+-        faqs.map((f) => (
+-          <div>
+-            <dt class="text-sm font-medium">{f.q}</dt>
+-            <dd class="mt-1.5 text-sm leading-relaxed text-paper-700">{f.a}</dd>
+-          </div>
+-        ))
+-      }
+-    </dl>
+-  </section>
++  <Faq faqs={faqs} />
+ </Base>
+diff --git a/src/pages/privacy.astro b/src/pages/privacy.astro
+index cd410b5..0359432 100644
+--- a/src/pages/privacy.astro
++++ b/src/pages/privacy.astro
+@@ -49,6 +49,15 @@ const description =
+       </p>
+     </section>
+ 
++    <section class="mt-8">
++      <h2 class="text-xl font-semibold tracking-tight">Contact and feedback</h2>
++      <p class="mt-3 text-sm leading-relaxed text-paper-700">
++        The contact form does not submit anything to Hours Apart or a form provider. It builds an
++        email draft locally and opens your email app. Your message only leaves the browser if you
++        choose to send that email, at which point your email provider handles it in the usual way.
++      </p>
++    </section>
++
+     <section class="mt-8">
+       <h2 class="text-xl font-semibold tracking-tight">Changes</h2>
+       <p class="mt-3 text-sm leading-relaxed text-paper-700">
+diff --git a/src/pages/time/[city].astro b/src/pages/time/[city].astro
+index f66e12d..e2167a0 100644
+--- a/src/pages/time/[city].astro
++++ b/src/pages/time/[city].astro
+@@ -1,6 +1,7 @@
+ ---
+ import Base from '../../layouts/Base.astro';
+ import CityClock from '../../components/CityClock.tsx';
++import Faq from '../../components/Faq.astro';
+ import { CITIES, COMPARISON_CITIES, citiesSharingZone, type City } from '../../lib/time/cities';
+ import {
+   describeDifference,
+@@ -189,11 +190,11 @@ const faqs = [
+ 
+     {
+       profile.transitions.length > 0 && (
+-        <div class="mt-4 overflow-x-auto rounded-xl border border-paper-200 bg-white">
+-          <table class="w-full text-sm">
++        <div class="mt-4 overflow-hidden overflow-x-auto rounded-xl border border-paper-200 bg-white elev">
++          <table class="data-table responsive-table transitions-table w-full text-sm">
+             <caption class="sr-only">Upcoming clock changes in {city.name}</caption>
+             <thead>
+-              <tr class="border-b border-paper-100 text-left text-xs text-paper-500">
++              <tr class="border-b border-paper-200 text-left text-xs font-medium text-paper-700">
+                 <th scope="col" class="px-3 py-2 font-medium">
+                   Date
+                 </th>
+@@ -258,11 +259,13 @@ const faqs = [
+       hedging &mdash; it is two governments moving their clocks on different weekends.
+     </p>
+ 
+-    <div class="mt-4 overflow-x-auto rounded-xl border border-paper-200 bg-white">
+-      <table class="w-full text-sm">
++    <div
++      class="mt-4 overflow-hidden overflow-x-auto rounded-xl border border-paper-200 bg-white elev"
++    >
++      <table class="data-table responsive-table comparisons-table w-full text-sm">
+         <caption class="sr-only">Time difference between {city.name} and other cities</caption>
+         <thead>
+-          <tr class="border-b border-paper-100 text-left text-xs text-paper-500">
++          <tr class="border-b border-paper-200 text-left text-xs font-medium text-paper-700">
+             <th scope="col" class="px-3 py-2 font-medium">City</th>
+             <th scope="col" class="px-3 py-2 font-medium">Difference now</th>
+             <th scope="col" class="px-3 py-2 font-medium">Across the year</th>
+@@ -309,13 +312,15 @@ const faqs = [
+       clock leaves out: 17:00 is a bright evening in one month and long dark in another.
+     </p>
+ 
+-    <div class="mt-4 overflow-x-auto rounded-xl border border-paper-200 bg-white">
+-      <table class="w-full text-sm">
++    <div
++      class="mt-4 overflow-hidden overflow-x-auto rounded-xl border border-paper-200 bg-white elev"
++    >
++      <table class="data-table responsive-table daylight-table w-full text-sm">
+         <caption class="sr-only">
+           Sunrise, sunset and daylight length in {city.name}, on the 21st of each month
+         </caption>
+         <thead>
+-          <tr class="border-b border-paper-100 text-left text-xs text-paper-500">
++          <tr class="border-b border-paper-200 text-left text-xs font-medium text-paper-700">
+             <th scope="col" class="px-3 py-2 font-medium">Month</th>
+             <th scope="col" class="px-3 py-2 font-medium">Sunrise</th>
+             <th scope="col" class="px-3 py-2 font-medium">Sunset</th>
+@@ -374,17 +379,5 @@ const faqs = [
+   </section>
+ 
+   <!-- ----------------------------------------------------------------- faq -->
+-  <section class="mt-14 max-w-2xl">
+-    <h2 class="text-xl font-semibold tracking-tight">Questions</h2>
+-    <dl class="mt-5 space-y-6">
+-      {
+-        faqs.map((f) => (
+-          <div>
+-            <dt class="text-sm font-medium">{f.q}</dt>
+-            <dd class="mt-1.5 text-sm leading-relaxed text-paper-700">{f.a}</dd>
+-          </div>
+-        ))
+-      }
+-    </dl>
+-  </section>
++  <Faq faqs={faqs} heading={`About time in ${city.name}`} />
+ </Base>
+diff --git a/src/styles/global.css b/src/styles/global.css
+index 972f200..1f70348 100644
+--- a/src/styles/global.css
++++ b/src/styles/global.css
+@@ -1,12 +1,21 @@
+ @import 'tailwindcss';
+ 
++/*
++ * Inter, self-hosted rather than pulled from a CDN. A site whose whole pitch is
++ * "nothing you enter is uploaded" should not open a connection to a third party
++ * to render its own text. `opsz` is the variable optical-size axis, which tunes
++ * letterforms for display sizes — the headlines need it, the body text does not.
++ */
++@import '@fontsource-variable/inter';
++
+ /*
+  * Deliberately not the default slate-and-indigo palette that every generated
+  * site ships with. Warm paper ground, near-black text, one saturated accent
+  * used only to mean "yes, you can meet here".
+  */
+ @theme {
+-  --font-sans: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
++  --font-sans:
++    'Inter Variable', Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+ 
+   --color-paper-50: oklch(0.993 0.004 85);
+   --color-paper-100: oklch(0.972 0.006 85);
+@@ -38,6 +47,19 @@
+   --color-sky-day: oklch(0.87 0.11 88);
+   --color-sky-dusk: oklch(0.66 0.1 45);
+   --color-sky-night: oklch(0.33 0.05 265);
++
++  /*
++   * ELEVATION
++   *
++   * Warm-tinted rather than neutral grey: a grey shadow on warm paper reads as
++   * dirt. Two layers each — a tight contact shadow to seat the edge, and a wide
++   * soft one for the lift. Re-pointed under each [data-sky] block below, because
++   * on a dark ground a black shadow is invisible and the lift has to come from a
++   * light top edge instead.
++   */
++  --shadow-card: 0 1px 2px oklch(0.42 0.03 75 / 0.05), 0 3px 10px oklch(0.42 0.03 75 / 0.055);
++  --shadow-lift: 0 2px 4px oklch(0.42 0.03 75 / 0.07), 0 14px 32px oklch(0.42 0.03 75 / 0.1);
++  --shadow-well: inset 0 1px 3px oklch(0.42 0.03 75 / 0.09);
+ }
+ 
+ /*
+@@ -76,6 +98,11 @@
+   --color-warn-100: oklch(0.335 0.055 65);
+   --color-warn-400: oklch(0.64 0.12 68);
+   --color-warn-700: oklch(0.87 0.085 80);
++
++  /* On a dark ground the lift has to come from a lit top edge, not a shadow. */
++  --shadow-card: 0 1px 0 oklch(1 0 0 / 0.05) inset, 0 2px 8px oklch(0.1 0.02 45 / 0.34);
++  --shadow-lift: 0 1px 0 oklch(1 0 0 / 0.07) inset, 0 12px 30px oklch(0.1 0.02 45 / 0.44);
++  --shadow-well: inset 0 1px 3px oklch(0.1 0.02 45 / 0.4);
+ }
+ 
+ [data-sky='night'] {
+@@ -96,6 +123,10 @@
+   --color-warn-100: oklch(0.315 0.055 65);
+   --color-warn-400: oklch(0.62 0.12 68);
+   --color-warn-700: oklch(0.855 0.085 80);
++
++  --shadow-card: 0 1px 0 oklch(1 0 0 / 0.05) inset, 0 2px 8px oklch(0.08 0.02 265 / 0.4);
++  --shadow-lift: 0 1px 0 oklch(1 0 0 / 0.07) inset, 0 12px 30px oklch(0.08 0.02 265 / 0.5);
++  --shadow-well: inset 0 1px 3px oklch(0.08 0.02 265 / 0.45);
+ }
+ 
+ /*
+@@ -119,6 +150,191 @@
+   font-feature-settings: 'tnum';
+ }
+ 
++/*
++ * A single wash of warm light from the top of the page. Sized in vmax so it
++ * scales with the viewport instead of banding on wide screens. Purely
++ * atmospheric — it sits behind everything and never carries text.
++ */
++/*
++ * Inter ships a tall x-height and loose default tracking that reads as slightly
++ * wide at display sizes. Optical sizing plus a touch of negative tracking on the
++ * big type is what separates "used Inter" from "set Inter properly".
++ */
++html {
++  font-optical-sizing: auto;
++  -webkit-font-smoothing: antialiased;
++  text-rendering: optimizeLegibility;
++}
++
++h1,
++h2,
++h3 {
++  letter-spacing: -0.021em;
++}
++
++body {
++  background-image: radial-gradient(
++    120vmax 60vmax at 50% -20vmax,
++    var(--color-paper-100) 0%,
++    transparent 60%
++  );
++  background-repeat: no-repeat;
++}
++
++@layer components {
++  /*
++   * ELEVATION CLASSES
++   *
++   * Deliberately not Tailwind's `shadow-*` utilities. Tailwind inlines a theme
++   * value at build time, so `shadow-card` bakes in the light-mode shadow and the
++   * per-sky overrides below would never apply — the dark palettes would silently
++   * lose their lift. Referencing the variable keeps elevation on the same
++   * re-pointing mechanism as every colour in the site.
++   */
++  .elev {
++    box-shadow: var(--shadow-card);
++  }
++  .elev-lift {
++    box-shadow: var(--shadow-lift);
++  }
++  .elev-hover {
++    transition: box-shadow 160ms ease;
++  }
++  .elev-hover:hover {
++    box-shadow: var(--shadow-lift);
++  }
++
++  /*
++   * THE SKY STRIP
++   *
++   * The product's whole argument in one element, so it gets real height and a
++   * true gradient rather than the abutted colour blocks it started as. The stops
++   * are written by the component as a custom property, because only it knows
++   * where this city's dawn and dusk actually fall.
++   */
++  .sky-strip {
++    background-image: linear-gradient(to right, var(--sky-stops));
++  }
++
++  /*
++   * Safari draws its own disclosure triangle and ignores `list-style: none`
++   * unless this pseudo-element is targeted directly.
++   */
++  summary::-webkit-details-marker {
++    display: none;
++  }
++
++  /* The now-marker. A hairline alone disappeared against mid-tone dusk. */
++  .sky-marker {
++    box-shadow:
++      0 0 0 1px oklch(1 0 0 / 0.55),
++      0 0 6px oklch(0.2 0.02 75 / 0.4);
++  }
++
++  /*
++   * Range input, restyled. The platform default is a grey pill that reads as
++   * unfinished next to everything else, and its thumb is too small to grab on
++   * touch. Track and thumb have to be declared per-engine; there is no
++   * shorthand that covers both.
++   */
++  .slider {
++    -webkit-appearance: none;
++    appearance: none;
++    width: 100%;
++    height: 1.5rem;
++    background: transparent;
++    cursor: grab;
++  }
++  .slider:active {
++    cursor: grabbing;
++  }
++
++  .slider::-webkit-slider-runnable-track {
++    height: 0.5rem;
++    border-radius: 999px;
++    background: linear-gradient(
++      to right,
++      var(--color-sky-night) 0%,
++      var(--color-sky-dusk) 22%,
++      var(--color-sky-day) 46%,
++      var(--color-sky-day) 62%,
++      var(--color-sky-dusk) 80%,
++      var(--color-sky-night) 100%
++    );
++    box-shadow: var(--shadow-well);
++  }
++  .slider::-moz-range-track {
++    height: 0.5rem;
++    border-radius: 999px;
++    background: linear-gradient(
++      to right,
++      var(--color-sky-night) 0%,
++      var(--color-sky-dusk) 22%,
++      var(--color-sky-day) 46%,
++      var(--color-sky-day) 62%,
++      var(--color-sky-dusk) 80%,
++      var(--color-sky-night) 100%
++    );
++    box-shadow: var(--shadow-well);
++  }
++
++  .slider::-webkit-slider-thumb {
++    -webkit-appearance: none;
++    appearance: none;
++    height: 1.25rem;
++    width: 1.25rem;
++    margin-top: -0.375rem;
++    border-radius: 999px;
++    background: var(--color-paper-50);
++    border: 2px solid var(--color-paper-900);
++    box-shadow: var(--shadow-card);
++    transition: transform 120ms ease;
++  }
++  .slider::-moz-range-thumb {
++    height: 1.25rem;
++    width: 1.25rem;
++    border-radius: 999px;
++    background: var(--color-paper-50);
++    border: 2px solid var(--color-paper-900);
++    box-shadow: var(--shadow-card);
++    transition: transform 120ms ease;
++  }
++  .slider:hover::-webkit-slider-thumb,
++  .slider:active::-webkit-slider-thumb {
++    transform: scale(1.12);
++  }
++  .slider:hover::-moz-range-thumb,
++  .slider:active::-moz-range-thumb {
++    transform: scale(1.12);
++  }
++  .slider:focus-visible::-webkit-slider-thumb {
++    outline: 2px solid var(--color-paper-900);
++    outline-offset: 2px;
++  }
++  .slider:focus-visible::-moz-range-thumb {
++    outline: 2px solid var(--color-paper-900);
++    outline-offset: 2px;
++  }
++
++  /*
++   * Data tables. These pages are mostly table, so the header needs to hold its
++   * own tone and the rows need banding — at a dozen-plus rows of near-identical
++   * numbers, hairlines alone are not enough to track across.
++   */
++  .data-table thead tr {
++    background: var(--color-paper-100);
++  }
++  .data-table tbody tr:nth-child(even) {
++    background: color-mix(in oklab, var(--color-paper-100) 45%, transparent);
++  }
++  .data-table tbody tr {
++    transition: background-color 120ms ease;
++  }
++  .data-table tbody tr:hover {
++    background: var(--color-paper-100);
++  }
++}
++
+ /* Focus ring that survives on both paper and dark cells. */
+ .ring-focus:focus-visible {
+   outline: 2px solid var(--color-paper-900);
+@@ -133,3 +349,227 @@
+     transition-duration: 0.01ms !important;
+   }
+ }
++
++/* Product shell details: a compact brand object and a useful, data-led hero. */
++.brand-mark {
++  background:
++    radial-gradient(
++      circle at 68% 28%,
++      color-mix(in oklab, var(--color-sky-day) 70%, transparent),
++      transparent 32%
++    ),
++    linear-gradient(145deg, var(--color-white), var(--color-paper-100));
++}
++
++.hero-preview {
++  isolation: isolate;
++  background:
++    radial-gradient(
++      circle at 12% 12%,
++      color-mix(in oklab, var(--color-go-100) 75%, transparent),
++      transparent 34%
++    ),
++    radial-gradient(
++      circle at 90% 94%,
++      color-mix(in oklab, var(--color-warn-100) 82%, transparent),
++      transparent 35%
++    ),
++    var(--color-white);
++}
++
++.hero-preview::before {
++  position: absolute;
++  inset: 0;
++  z-index: -1;
++  content: '';
++  opacity: 0.38;
++  background-image:
++    linear-gradient(to right, var(--color-paper-200) 1px, transparent 1px),
++    linear-gradient(to bottom, var(--color-paper-200) 1px, transparent 1px);
++  background-size: 2rem 2rem;
++  mask-image: linear-gradient(to bottom, black, transparent 72%);
++}
++
++/* World-clock rows use a different information order on touch screens. */
++.city-row-layout {
++  display: grid;
++  grid-template-areas:
++    'sky identity time'
++    'strip strip strip'
++    'order actions actions';
++  grid-template-columns: auto minmax(0, 1fr) auto;
++  align-items: start;
++  column-gap: 0.75rem;
++  row-gap: 0.75rem;
++}
++
++.city-row-order {
++  grid-area: order;
++}
++
++.city-row-sky-dot {
++  grid-area: sky;
++}
++
++.city-row-identity {
++  grid-area: identity;
++}
++
++.city-row-time {
++  grid-area: time;
++}
++
++.city-row-actions {
++  grid-area: actions;
++}
++
++.city-row-strip {
++  grid-area: strip;
++}
++
++@media (min-width: 640px) {
++  .city-row-layout {
++    grid-template-areas:
++      'order sky identity time actions'
++      '. strip strip strip .';
++    grid-template-columns: auto auto minmax(0, 1fr) auto auto;
++    align-items: center;
++    column-gap: 0.875rem;
++    row-gap: 0.625rem;
++  }
++}
++
++/* Detail-page atmosphere comes from the data, not decorative stock art. */
++.city-live-card::before,
++.pair-panel::before {
++  position: absolute;
++  inset: 0;
++  content: '';
++  pointer-events: none;
++  opacity: 0.42;
++}
++
++.city-live-day::before,
++.pair-panel-day::before {
++  background: radial-gradient(circle at 92% 5%, var(--color-sky-day), transparent 40%);
++}
++
++.city-live-twilight::before,
++.pair-panel-twilight::before {
++  background: radial-gradient(circle at 92% 5%, var(--color-sky-dusk), transparent 42%);
++}
++
++.city-live-night::before,
++.pair-panel-night::before {
++  background: radial-gradient(circle at 92% 5%, var(--color-sky-night), transparent 42%);
++  opacity: 0.25;
++}
++
++/* Tables become labelled records on phones; no squeezed dates or mystery scroll. */
++@media (max-width: 639px) {
++  .responsive-table thead {
++    position: absolute;
++    width: 1px;
++    height: 1px;
++    overflow: hidden;
++    clip: rect(0 0 0 0);
++    white-space: nowrap;
++  }
++
++  .responsive-table,
++  .responsive-table tbody,
++  .responsive-table tr,
++  .responsive-table td {
++    display: block;
++    width: 100%;
++  }
++
++  .responsive-table tbody {
++    display: grid;
++    gap: 0.625rem;
++    padding: 0.625rem;
++  }
++
++  .responsive-table tbody tr {
++    overflow: hidden;
++    border: 1px solid var(--color-paper-200);
++    border-radius: 0.75rem;
++    background: var(--color-white) !important;
++  }
++
++  .responsive-table tbody td {
++    display: grid;
++    grid-template-columns: minmax(6.5rem, 0.8fr) minmax(0, 1.2fr);
++    gap: 0.75rem;
++    align-items: baseline;
++    padding: 0.55rem 0.75rem;
++    border-bottom: 1px solid var(--color-paper-100);
++    text-align: right;
++  }
++
++  .responsive-table tbody td:last-child {
++    border-bottom: 0;
++  }
++
++  .responsive-table tbody td::before {
++    color: var(--color-paper-500);
++    font-family: var(--font-sans);
++    font-size: 0.625rem;
++    font-weight: 650;
++    letter-spacing: 0.08em;
++    text-align: left;
++    text-transform: uppercase;
++  }
++
++  .transitions-table td:nth-child(1)::before {
++    content: 'Date';
++  }
++  .transitions-table td:nth-child(2)::before {
++    content: 'Local time';
++  }
++  .transitions-table td:nth-child(3)::before {
++    content: 'Change';
++  }
++  .transitions-table td:nth-child(4)::before {
++    content: 'New offset';
++  }
++  .comparisons-table td:nth-child(1)::before {
++    content: 'City';
++  }
++  .comparisons-table td:nth-child(2)::before {
++    content: 'Difference now';
++  }
++  .comparisons-table td:nth-child(3)::before {
++    content: 'Across the year';
++  }
++  .daylight-table td:nth-child(1)::before {
++    content: 'Month';
++  }
++  .daylight-table td:nth-child(2)::before {
++    content: 'Sunrise';
++  }
++  .daylight-table td:nth-child(3)::before {
++    content: 'Sunset';
++  }
++  .daylight-table td:nth-child(4)::before {
++    content: 'Daylight';
++  }
++  .spans-table td:nth-child(1)::before {
++    content: 'From';
++  }
++  .spans-table td:nth-child(2)::before {
++    content: 'Until';
++  }
++  .spans-table td:nth-child(3)::before {
++    content: 'Difference';
++  }
++  .spans-table td:nth-child(4)::before {
++    content: 'Length';
++  }
++  .conversion-table td:nth-child(1)::before {
++    content: 'From';
++  }
++  .conversion-table td:nth-child(2)::before {
++    content: 'To';
++  }
++}

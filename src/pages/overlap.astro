@@ -1,15 +1,16 @@
 ---
 import Base from '../layouts/Base.astro';
 import TeamPlanner from '../components/TeamPlanner.tsx';
+import Faq from '../components/Faq.astro';
 
-const title = 'Meeting time finder — overlapping working hours across time zones';
+const title = 'Meeting Time Finder across time zones | Hours Apart';
 const description =
-  'Find the hours a distributed team is actually free, then get a warning for every daylight saving date that will move the meeting. No sign-up; the whole scenario lives in a shareable link.';
+  'Compare working hours across time zones, choose a meeting, and see who can attend all or part of it before daylight saving moves the local time. No sign-up; the whole scenario lives in a shareable link.';
 
 const faqs = [
   {
     q: 'What counts as an overlap here?',
-    a: 'An hour where every person is inside their own working hours on their own working days. The darker green columns are the ones that work for everybody; the pale green means only some people are free. If nothing is dark green, the honest answer is that these hours do not line up, and the tool says so rather than suggesting a bad slot.',
+    a: "The person rows show configured working hours, not calendar free/busy data, and they never change with meeting length. Click any point to choose a start: green means working hours, gray means outside working hours, and the outline shows the selected meeting. The summary reports each person's full, partial or zero coverage.",
   },
   {
     q: 'Why does daylight saving matter for a recurring meeting?',
@@ -45,13 +46,21 @@ const faqs = [
     })}
   />
 
-  <header class="mb-7 max-w-2xl">
-    <h1 class="text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
-      When is everyone free?
+  <header class="mb-9">
+    <p class="text-[11px] font-semibold tracking-[0.15em] text-paper-500 uppercase">
+      Meeting planner
+    </p>
+
+    <h1
+      class="mt-4 max-w-3xl text-4xl leading-[1.05] font-semibold tracking-tight text-balance sm:text-5xl"
+    >
+      When can everyone meet?
     </h1>
-    <p class="mt-3 text-paper-700">
-      Set each person's working hours and days. The grid shows the hours that suit everybody &mdash;
-      and, once you pick one, every daylight saving date that will quietly move it.
+
+    <p class="mt-4 max-w-2xl text-lg leading-relaxed text-paper-700">
+      Set each person&rsquo;s working hours and days, then choose a start. Green and gray stay
+      fixed; the outline shows the selected meeting, and the summary explains full or partial
+      coverage.
     </p>
   </header>
 
@@ -72,17 +81,5 @@ const faqs = [
     </p>
   </section>
 
-  <section class="mt-12 max-w-2xl">
-    <h2 class="text-xl font-semibold tracking-tight">Questions</h2>
-    <dl class="mt-5 space-y-6">
-      {
-        faqs.map((f) => (
-          <div>
-            <dt class="text-sm font-medium">{f.q}</dt>
-            <dd class="mt-1.5 text-sm leading-relaxed text-paper-700">{f.a}</dd>
-          </div>
-        ))
-      }
-    </dl>
-  </section>
+  <Faq faqs={faqs} />
 </Base>

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { decodeScenario, encodeScenario, type Scenario } from './share';
+import { DEFAULT_MEETING_DURATION, decodeScenario, encodeScenario, type Scenario } from './share';
 import { DEFAULT_WORK_DAYS, type Participant } from './overlap';
+import { isValidTimeZone } from './zone';
+import { removeParticipant, reorderParticipant } from './useScenario';
 import {
   CITIES,
   HUBS,
@@ -33,6 +35,7 @@ describe('scenario links', () => {
     ],
     anchorIndex: 1,
     meetingMinutes: 9 * 60,
+    durationMinutes: 90,
     date: '2026-12-25',
   };
 
@@ -42,6 +45,7 @@ describe('scenario links', () => {
     expect(decoded.participants).toHaveLength(3);
     expect(decoded.anchorIndex).toBe(1);
     expect(decoded.meetingMinutes).toBe(540);
+    expect(decoded.durationMinutes).toBe(90);
     expect(decoded.date).toBe('2026-12-25');
     expect(decoded.participants[0].timeZone).toBe('Australia/Sydney');
     expect(decoded.participants[1].workStart).toBe(8 * 60 + 30);
@@ -62,13 +66,14 @@ describe('scenario links', () => {
       ],
       anchorIndex: 0,
       meetingMinutes: null,
+      durationMinutes: DEFAULT_MEETING_DURATION,
       date: null,
     });
 
     // A derived label adds no field; a custom one adds a fifth. Checking the
     // field count rather than searching for "Sydney", which is in the zone id
     // regardless.
-    const [sydneyChunk, londonChunk] = decodeURIComponent(encoded).replace(/^p=/, '').split('_');
+    const [sydneyChunk, londonChunk] = decodeURIComponent(encoded).replace(/^p=/, '').split('|');
     expect(sydneyChunk.split('-')).toHaveLength(4);
     expect(londonChunk.split('-')).toHaveLength(5);
     expect(encoded).toContain('Priya');
@@ -116,13 +121,96 @@ describe('scenario links', () => {
     }
   });
 
-  it('reads links made before dates existed', () => {
+  it('reads links made before dates and durations existed', () => {
     const decoded = decodeScenario(
       '?p=Australia/Sydney-540-1020-12345_Europe/London-540-1020-12345&a=0&m=540',
     )!;
     expect(decoded.participants).toHaveLength(2);
     expect(decoded.date).toBeNull();
     expect(decoded.meetingMinutes).toBe(540);
+    expect(decoded.durationMinutes).toBe(DEFAULT_MEETING_DURATION);
+  });
+
+  it('preserves separator characters and zone underscores in new and legacy links', () => {
+    const withNewYork: Scenario = {
+      ...scenario,
+      participants: [
+        person({ id: 'p0', timeZone: 'America/New_York', label: 'Ops~East|Lead' }),
+        person({ id: 'p1', timeZone: 'Asia/Ho_Chi_Minh' }),
+      ],
+    };
+    const encoded = encodeScenario(withNewYork);
+    expect(encoded).toContain('%7C');
+    const decodedNew = decodeScenario(`?${encoded}`)!;
+    expect(decodedNew.participants.map((p) => p.timeZone)).toEqual([
+      'America/New_York',
+      'Asia/Ho_Chi_Minh',
+    ]);
+    expect(decodedNew.participants[0].label).toBe('Ops~East|Lead');
+
+    const legacy = decodeScenario(
+      '?p=America/New_York-540-1020-12345_Asia/Ho_Chi_Minh-540-1020-12345_CST6CDT-540-1020-12345',
+    )!;
+    expect(legacy.participants.map((p) => p.timeZone)).toEqual([
+      'America/New_York',
+      'Asia/Ho_Chi_Minh',
+      'CST6CDT',
+    ]);
+  });
+
+  it('omits the default duration and round-trips supported durations', () => {
+    expect(
+      encodeScenario({ ...scenario, durationMinutes: DEFAULT_MEETING_DURATION }),
+    ).not.toContain('l=');
+
+    for (const durationMinutes of [15, 45, 120, 150, 720] as const) {
+      const encoded = encodeScenario({ ...scenario, durationMinutes });
+      expect(decodeScenario(`?${encoded}`)!.durationMinutes).toBe(durationMinutes);
+    }
+  });
+
+  it('falls back to 30 minutes for off-grid, out-of-range or malformed durations', () => {
+    for (const bad of ['0', '20', '7', '735', '-15', 'junk']) {
+      const decoded = decodeScenario(`?p=Asia/Tokyo-540-1020-12345&l=${bad}`)!;
+      expect(decoded.durationMinutes, bad).toBe(DEFAULT_MEETING_DURATION);
+    }
+  });
+});
+
+describe('scenario ordering', () => {
+  const entries = [
+    person({ id: 'a', timeZone: 'Australia/Sydney', label: 'Sydney' }),
+    person({ id: 'base', timeZone: 'Europe/London', label: 'London' }),
+    person({ id: 'b', timeZone: 'Asia/Tokyo', label: 'Tokyo' }),
+  ];
+
+  it('reorders visible cities across the hidden base without moving the base slot', () => {
+    const moved = reorderParticipant(entries, 'a', 1, 'base');
+    expect(moved.map((participant) => participant.id)).toEqual(['b', 'base', 'a']);
+    expect(moved[1]).toBe(entries[1]);
+  });
+
+  it('supports direct first and last positions and ignores invalid reorder requests', () => {
+    expect(reorderParticipant(entries, 'b', 0, 'base').map(({ id }) => id)).toEqual([
+      'b',
+      'base',
+      'a',
+    ]);
+    expect(reorderParticipant(entries, 'base', 0, 'base')).toBe(entries);
+    expect(reorderParticipant(entries, 'missing', 0, 'base')).toBe(entries);
+    expect(reorderParticipant(entries, 'a', 0, 'base')).toBe(entries);
+  });
+
+  it('preserves the base when another city is removed', () => {
+    const result = removeParticipant(entries, 'a', 'base');
+    expect(result.participants.map((participant) => participant.id)).toEqual(['base', 'b']);
+    expect(result.anchorId).toBe('base');
+  });
+
+  it('chooses the adjacent city when the base itself is removed', () => {
+    const result = removeParticipant(entries, 'base', 'base');
+    expect(result.participants.map((participant) => participant.id)).toEqual(['a', 'b']);
+    expect(result.anchorId).toBe('b');
   });
 });
 
@@ -146,6 +234,27 @@ describe('city search', () => {
   it('ignores accents so an ASCII keyboard still finds the city', () => {
     expect(searchCities('sao paulo')[0].timeZone).toBe('America/Sao_Paulo');
     expect(searchCities('bogota')[0].timeZone).toBe('America/Bogota');
+  });
+
+  it('finds representative regional cities and their airport aliases', () => {
+    expect(searchCities('chengdu')[0].name).toBe('Chengdu');
+    expect(searchCities('CTU')[0].name).toBe('Chengdu');
+    expect(searchCities('kyoto')[0].name).toBe('Kyoto');
+    expect(searchCities('bali')[0].name).toBe('Denpasar');
+  });
+
+  it('preserves a secondary city identity when it shares another city’s zone', () => {
+    const chengdu = cityByName('Chengdu')!;
+    const encoded = encodeScenario({
+      participants: [person({ id: 'p0', timeZone: chengdu.timeZone, label: chengdu.name })],
+      anchorIndex: 0,
+      meetingMinutes: null,
+      durationMinutes: DEFAULT_MEETING_DURATION,
+      date: null,
+    });
+    const decoded = decodeScenario(`?${encoded}`)!;
+    expect(decoded.participants[0].label).toBe('Chengdu');
+    expect(decoded.participants[0].timeZone).toBe('Asia/Shanghai');
   });
 
   it('finds cities by country', () => {
@@ -188,6 +297,10 @@ describe('city slugs', () => {
       expect(cityBySlug(city.slug)?.name).toBe(city.name);
       expect(encodeURIComponent(city.slug)).toBe(city.slug);
     }
+  });
+
+  it('every city uses a valid IANA time zone', () => {
+    for (const city of CITIES) expect(isValidTimeZone(city.timeZone), city.name).toBe(true);
   });
 
   it('has enough hubs to be worth generating pairs, and they are real cities', () => {

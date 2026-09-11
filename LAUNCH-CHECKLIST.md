@@ -7,7 +7,7 @@ Legend: `[x]` done · `[ ]` todo · **(Blocker)** must ship before public launch
 **(Recommended)** soon · **(Nice-to-have)** when there is time · _(you)_ needs your
 account/DNS · _(QA)_ manual testing.
 
-Last updated: 2026-09-01. Build is green: 642 pages, 93 tests, tsc clean.
+Last updated: 2026-09-01. Build is green: 659 pages, 110 tests, tsc and Prettier clean.
 
 ## 1. Quality gates
 
@@ -68,13 +68,16 @@ Last updated: 2026-09-01. Build is green: 642 pages, 93 tests, tsc clean.
 ## 9. Cross-browser / device QA
 
 - [ ] (Recommended) _(QA)_ Chrome / Firefox / Safari + iOS Safari (date input) + Android
-- [ ] (Recommended) _(QA)_ Mobile layout of the TeamPlanner grid
+- [ ] (Recommended) _(QA)_ Mobile layout of the TeamPlanner recommendations and duration controls
+- [ ] (Recommended) _(QA)_ Download `.ics` and open it in Apple/Google/Outlook Calendar
 - [ ] (Recommended) _(QA)_ DST edge cases against real upcoming transition dates (the headline feature)
 
 ## 10. Content, legal, trust
 
 - [x] **(Blocker)** Custom 404 page
 - [x] (Recommended) Privacy page (`/privacy`, linked in the footer) — stores nothing but `localStorage['sky-mode']`
+- [x] (Recommended) Contact/feedback page (`/contact`) links out to a hosted Tally form; no backend, no mailbox
+- [ ] (Recommended) _(you)_ Submit a real test response through the Tally form and confirm you receive the notification
 - [x] (Recommended) Copy proofread; FAQ content reviewed
 
 ## 11. Launch ops

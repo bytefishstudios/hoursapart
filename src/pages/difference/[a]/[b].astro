@@ -1,6 +1,7 @@
 ---
 import Base from '../../../layouts/Base.astro';
 import PairClock from '../../../components/PairClock.tsx';
+import Faq from '../../../components/Faq.astro';
 import { hubPairs, type City } from '../../../lib/time/cities';
 import {
   convertTime,
@@ -46,6 +47,36 @@ const profileB = dstProfile(b.timeZone, buildInstant, 14);
 /** Spans that a reader could actually run into; the tail beyond a year is noise. */
 const spans = diff.spans;
 
+/*
+ * Shared business hours, computed rather than asserted.
+ *
+ * This is what someone searching for a time difference is usually really after:
+ * not the number itself, but when they can actually call. It also fills the hole
+ * on constant-gap pairs, which skip the spans table above and would otherwise be
+ * the thinnest pages in the build.
+ */
+const officeHours = { start: 9 * 60, end: 17 * 60 };
+const overlapSlots = Array.from({ length: 96 }, (_, i) => i * 15).filter((minutesInA) => {
+  if (minutesInA < officeHours.start || minutesInA >= officeHours.end) return false;
+  const inB = convertTime(buildDate, a.timeZone, minutesInA, b.timeZone).minutes;
+  return inB >= officeHours.start && inB < officeHours.end;
+});
+const sharedHours = overlapSlots.length / 4;
+const overlapWindow =
+  overlapSlots.length > 0
+    ? {
+        fromA: overlapSlots[0],
+        toA: overlapSlots[overlapSlots.length - 1] + 15,
+        fromB: convertTime(buildDate, a.timeZone, overlapSlots[0], b.timeZone),
+        toB: convertTime(
+          buildDate,
+          a.timeZone,
+          overlapSlots[overlapSlots.length - 1] + 15,
+          b.timeZone,
+        ),
+      }
+    : null;
+
 /** A conversion table at the hours people actually schedule. */
 const workingHours = [7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20];
 const conversions = workingHours.map((h) => ({
@@ -63,16 +94,17 @@ const title = diff.varies
 
 const description = diff.varies
   ? `${b.name} is ${gapWord} from ${a.name}. The difference is not fixed: it changes ${spans.length - 1} times a year because the two places move their clocks on different weekends. Exact dates and a converter for any date.`
-  : `${b.name} is ${formatGap(diff.gapAtStart)} than ${a.name}, and unlike most city pairs this gap stays the same all year. Convert any time on any date.`;
+  : `${b.name} is ${formatGap(diff.gapAtStart)} relative to ${a.name}, and unlike most city pairs this gap stays the same all year. Convert any time on any date.`;
 
+const seoOrigin = (Astro.site?.href ?? 'https://hoursapart.app/').replace(/\/$/, '');
 const seedQuery = `p=${a.timeZone}-540-1020-12345_${b.timeZone}-540-1020-12345`;
 
 const faqs = [
   {
     q: `What is the time difference between ${a.name} and ${b.name}?`,
     a: diff.varies
-      ? `There is no single answer, which is why most converters get this wrong for part of the year. ${b.name} is ${diff.distinctGaps.map((g) => formatGap(g)).join(', ')} than ${a.name} at different points in the year. Right now it is ${formatGap(diff.gapAtStart)}. The table on this page gives the exact dates for each.`
-      : `${b.name} is ${formatGap(diff.gapAtStart)} than ${a.name}, and this pair is unusual in that the gap does not change during the year.`,
+      ? `There is no single answer, which is why most converters get this wrong for part of the year. ${b.name} is ${diff.distinctGaps.map((g) => formatGap(g)).join(', ')} relative to ${a.name} at different points in the year. Right now it is ${formatGap(diff.gapAtStart)}. The table on this page gives the exact dates for each.`
+      : `${b.name} is ${formatGap(diff.gapAtStart)} relative to ${a.name}, and this pair is unusual in that the gap does not change during the year.`,
   },
   {
     q: `Why does the difference between ${a.name} and ${b.name} change?`,
@@ -107,7 +139,7 @@ const faqs = [
     ? [
         {
           q: `When is the difference between ${a.name} and ${b.name} unusual?`,
-          a: `The shortest window runs from ${formatIsoDateLong(diff.shortestSpan.from)} to ${formatIsoDateLong(diff.shortestSpan.to)} — ${diff.shortestSpan.days} day${diff.shortestSpan.days === 1 ? '' : 's'} during which ${b.name} is ${formatGap(diff.shortestSpan.gapMinutes)} than ${a.name} rather than the usual amount. Short windows like this are where recurring meetings break, because nobody thinks to check.`,
+          a: `The shortest window runs from ${formatIsoDateLong(diff.shortestSpan.from)} to ${formatIsoDateLong(diff.shortestSpan.to)} — ${diff.shortestSpan.days} day${diff.shortestSpan.days === 1 ? '' : 's'} during which ${b.name} is ${formatGap(diff.shortestSpan.gapMinutes)} relative to ${a.name} rather than the usual amount. Short windows like this are where recurring meetings break, because nobody thinks to check.`,
         },
       ]
     : []),
@@ -132,9 +164,30 @@ const faqs = [
       })),
     })}
   />
+  <script
+    type="application/ld+json"
+    slot="head"
+    set:html={JSON.stringify({
+      '@context': 'https://schema.org',
+      '@type': 'BreadcrumbList',
+      itemListElement: [
+        { '@type': 'ListItem', position: 1, name: 'World clock', item: `${seoOrigin}/` },
+        {
+          '@type': 'ListItem',
+          position: 2,
+          name: 'Time differences',
+          item: `${seoOrigin}/difference`,
+        },
+        { '@type': 'ListItem', position: 3, name: a.name, item: `${seoOrigin}/time/${a.slug}` },
+        { '@type': 'ListItem', position: 4, name: `${a.name} to ${b.name}` },
+      ],
+    })}
+  />
 
   <nav aria-label="Breadcrumb" class="mb-5 text-xs text-paper-500">
     <a href="/" class="ring-focus hover:text-paper-900">World clock</a>
+    <span aria-hidden="true" class="mx-1.5">/</span>
+    <a href="/difference" class="ring-focus hover:text-paper-900">Differences</a>
     <span aria-hidden="true" class="mx-1.5">/</span>
     <a href={`/time/${a.slug}`} class="ring-focus hover:text-paper-900">{a.name}</a>
     <span aria-hidden="true" class="mx-1.5">/</span>
@@ -156,8 +209,8 @@ const faqs = [
           </>
         ) : (
           <>
-            {b.name} is {formatGap(diff.gapAtStart)} than {a.name}, and this pair is unusual: the
-            gap holds steady all year.
+            {b.name} is {formatGap(diff.gapAtStart)} relative to {a.name}, and this pair is unusual:
+            the gap holds steady all year.
           </>
         )
       }
@@ -182,13 +235,13 @@ const faqs = [
           which the difference is a particular number. Dates are {a.name}'s local dates.
         </p>
 
-        <div class="mt-4 overflow-x-auto rounded-xl border border-paper-200 bg-white">
-          <table class="w-full text-sm">
+        <div class="mt-4 overflow-hidden overflow-x-auto rounded-xl border border-paper-200 bg-white elev">
+          <table class="data-table responsive-table spans-table w-full text-sm">
             <caption class="sr-only">
               Time difference between {a.name} and {b.name} by date range
             </caption>
             <thead>
-              <tr class="border-b border-paper-100 text-left text-xs text-paper-500">
+              <tr class="border-b border-paper-200 text-left text-xs font-medium text-paper-700">
                 <th scope="col" class="px-3 py-2 font-medium">
                   From
                 </th>
@@ -247,11 +300,13 @@ const faqs = [
       the table of gaps says the difference changes, these numbers change with it.
     </p>
 
-    <div class="mt-4 overflow-x-auto rounded-xl border border-paper-200 bg-white">
-      <table class="w-full text-sm">
+    <div
+      class="mt-4 overflow-hidden overflow-x-auto rounded-xl border border-paper-200 bg-white elev"
+    >
+      <table class="data-table responsive-table conversion-table w-full text-sm">
         <caption class="sr-only">Hourly conversion from {a.name} to {b.name}</caption>
         <thead>
-          <tr class="border-b border-paper-100 text-left text-xs text-paper-500">
+          <tr class="border-b border-paper-200 text-left text-xs font-medium text-paper-700">
             <th scope="col" class="px-3 py-2 font-medium">{a.name}</th>
             <th scope="col" class="px-3 py-2 font-medium">{b.name}</th>
           </tr>
@@ -317,6 +372,62 @@ const faqs = [
     }
   </section>
 
+  <!-- ------------------------------------------------------ shared hours -->
+  <section class="mt-12 max-w-2xl">
+    <h2 class="text-xl font-semibold tracking-tight">
+      When {a.name} and {b.name} can actually talk
+    </h2>
+
+    {
+      overlapWindow ? (
+        <>
+          <p class="mt-3 text-sm leading-relaxed text-paper-700">
+            On a standard 09:00–17:00 day in both cities, the working hours overlap for{' '}
+            <strong class="font-semibold">
+              {sharedHours} {sharedHours === 1 ? 'hour' : 'hours'}
+            </strong>
+            . That window is{' '}
+            <span class="nums">
+              {formatMinutes(overlapWindow.fromA)}–{formatMinutes(overlapWindow.toA)}
+            </span>{' '}
+            in {a.name}, which is{' '}
+            <span class="nums">
+              {formatMinutes(overlapWindow.fromB.minutes)}–
+              {formatMinutes(overlapWindow.toB.minutes)}
+            </span>{' '}
+            in {b.name}
+            {overlapWindow.fromB.dayShift !== 0 && ' on the following day'}.
+          </p>
+          <p class="mt-3 text-sm leading-relaxed text-paper-700">
+            {sharedHours >= 4
+              ? `That is comfortable: there is room for a recurring call without either side moving their day.`
+              : `That is tight. A recurring call here has very little slack, so a daylight saving shift at either end can wipe the window out entirely.`}
+          </p>
+        </>
+      ) : (
+        <p class="mt-3 text-sm leading-relaxed text-paper-700">
+          On a standard 09:00–17:00 day there is <strong class="font-semibold">no overlap</strong>{' '}
+          at all between {a.name} and {b.name}. One side has to take the call outside their working
+          hours — there is no arrangement of a normal working day that avoids it. The
+          <a href="/overlap" class="ring-focus rounded underline hover:text-paper-900">
+            meeting planner
+          </a>{' '}
+          shows how much either side has to stretch, and who is affected least.
+        </p>
+      )
+    }
+
+    <p class="mt-3 text-xs leading-relaxed text-paper-500">
+      Calculated for {formatIsoDateLong(buildDate)}. Because the gap
+      {diff.varies ? ' changes during the year' : ' holds steady all year'}, this window
+      {
+        diff.varies
+          ? ' moves with it — the planner recomputes it for any date you pick.'
+          : ' is the same whenever you check it.'
+      }
+    </p>
+  </section>
+
   <!-- ------------------------------------------------------------------ next -->
   <section class="mt-10 flex flex-wrap gap-2">
     <a
@@ -334,17 +445,5 @@ const faqs = [
   </section>
 
   <!-- ------------------------------------------------------------------- faq -->
-  <section class="mt-14 max-w-2xl">
-    <h2 class="text-xl font-semibold tracking-tight">Questions</h2>
-    <dl class="mt-5 space-y-6">
-      {
-        faqs.map((f) => (
-          <div>
-            <dt class="text-sm font-medium">{f.q}</dt>
-            <dd class="mt-1.5 text-sm leading-relaxed text-paper-700">{f.a}</dd>
-          </div>
-        ))
-      }
-    </dl>
-  </section>
+  <Faq faqs={faqs} heading={`${a.name} and ${b.name}, explained`} />
 </Base>
