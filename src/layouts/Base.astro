@@ -10,7 +10,9 @@ interface Props {
 }
 
 const { title, description, path, image } = Astro.props;
-const origin = Astro.site ?? Astro.url.origin;
+// `Astro.site` is a URL and already includes its trailing slash. Normalising
+// it here prevents JSON-LD URLs below from accidentally becoming `//`.
+const origin = new URL(Astro.site ?? Astro.url.origin);
 const canonical = new URL(path ?? Astro.url.pathname, origin);
 const ogImage = new URL(image ?? '/og.png', origin);
 
@@ -106,7 +108,7 @@ const footerPairs = footerPairSlugs
           {
             '@type': 'WebSite',
             '@id': `${origin}#website`,
-            url: `${origin}/`,
+            url: origin.href,
             name: 'Hours Apart',
             description:
               'A world clock that shows whether it is light there, and warns you before daylight saving moves a recurring meeting.',
@@ -115,7 +117,7 @@ const footerPairs = footerPairSlugs
           {
             '@type': 'WebApplication',
             '@id': `${origin}#app`,
-            url: `${origin}/`,
+            url: origin.href,
             name: 'Hours Apart',
             applicationCategory: 'BusinessApplication',
             operatingSystem: 'Any',
