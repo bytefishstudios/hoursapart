@@ -15,9 +15,12 @@ const { title, description, path, image } = Astro.props;
 const origin = new URL(Astro.site ?? Astro.url.origin);
 const canonical = new URL(path ?? Astro.url.pathname, origin);
 const ogImage = new URL(image ?? '/og.png', origin);
-// Legal pages are linked from the consent message itself, so they must remain
-// free of ad tags and any consent-required advertising scripts.
-const showAdvertisingScript = path !== '/privacy' && path !== '/terms';
+// Ads run only on the content pages that earn search traffic — the city and
+// difference pages. The tools (`/`, `/overlap`) and the legal/contact pages
+// stay free of ad tags: the tools to protect their Core Web Vitals and feel,
+// the legal pages because the consent message links to them.
+const adPath = path ?? Astro.url.pathname;
+const showAdvertisingScript = adPath.startsWith('/time/') || adPath.startsWith('/difference/');
 
 /** Current path, normalised without a trailing slash, for marking the active nav item. */
 const here = (path ?? Astro.url.pathname).replace(/\/+$/, '') || '/';
@@ -355,8 +358,10 @@ const footerPairs = footerPairSlugs
         >
           <p class="max-w-md">
             Time zone data comes from your own device's IANA database, so it is as current as your
-            browser. Hours Apart has no form or account backend; details only leave your device when
-            you choose an external calendar or email action.
+            browser. Hours Apart has no form or account backend. City and difference pages show ads
+            via Google AdSense; see the
+            <a href="/privacy" class="ring-focus rounded underline hover:text-paper-900">privacy</a>
+            page for what that involves.
           </p>
 
           <div class="flex flex-wrap items-center gap-1.5 sm:justify-end">
