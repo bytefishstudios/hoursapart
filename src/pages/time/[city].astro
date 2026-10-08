@@ -138,7 +138,7 @@ const faqs = [
     q: `Why does the time difference to ${city.name} keep changing?`,
     a:
       varyingComparisons.length > 0
-        ? `Because the two places do not change their clocks on the same weekend, and in opposite hemispheres they change in opposite directions. ${varyingComparisons[0].other.name} is a clear example: it sits ${varyingComparisons[0].diff.distinctGaps.map((g) => formatGap(g)).join(', then ')} across the year rather than one fixed distance.`
+        ? `Because the two places do not change their clocks on the same weekend. ${varyingComparisons[0].other.name} is a clear example: it sits ${varyingComparisons[0].diff.distinctGaps.map((g) => formatGap(g)).join(', then ')} across the year rather than one fixed distance.`
         : `For the cities listed on this page the difference happens to stay constant, because none of the pairs involved change their clocks at different times. That is the exception rather than the rule.`,
   },
   {
