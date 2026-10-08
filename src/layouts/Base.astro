@@ -15,6 +15,9 @@ const { title, description, path, image } = Astro.props;
 const origin = new URL(Astro.site ?? Astro.url.origin);
 const canonical = new URL(path ?? Astro.url.pathname, origin);
 const ogImage = new URL(image ?? '/og.png', origin);
+// Legal pages are linked from the consent message itself, so they must remain
+// free of ad tags and any consent-required advertising scripts.
+const showAdvertisingScript = path !== '/privacy' && path !== '/terms';
 
 /** Current path, normalised without a trailing slash, for marking the active nav item. */
 const here = (path ?? Astro.url.pathname).replace(/\/+$/, '') || '/';
@@ -68,11 +71,16 @@ const footerPairs = footerPairSlugs
     <title>{title}</title>
     <meta name="description" content={description} />
     <link rel="canonical" href={canonical.href} />
-    <script
-      is:inline
-      async
-      src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9292097300134414"
-      crossorigin="anonymous"></script>
+    {
+      showAdvertisingScript && (
+        <script
+          is:inline
+          async
+          src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-9292097300134414"
+          crossorigin="anonymous"
+        />
+      )
+    }
 
     <meta property="og:type" content="website" />
     <meta property="og:url" content={canonical.href} />
