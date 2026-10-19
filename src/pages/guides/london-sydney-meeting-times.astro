@@ -1,0 +1,83 @@
+---
+import Base from '../../layouts/Base.astro';
+
+const title = 'Planning a meeting between London and Sydney';
+const description =
+  'How to choose a fair London–Sydney meeting time, account for daylight-saving changes, and communicate the compromise clearly.';
+---
+
+<Base title={title} description={description} path="/guides/london-sydney-meeting-times">
+  <article class="max-w-2xl">
+    <nav aria-label="Breadcrumb" class="mb-5 text-xs text-paper-500">
+      <a href="/guides" class="ring-focus hover:text-paper-900">Guides</a>
+      <span aria-hidden="true" class="mx-1.5">/</span>
+      <span aria-current="page">London and Sydney</span>
+    </nav>
+    <header class="mb-8">
+      <p class="text-[11px] font-semibold tracking-[0.15em] text-paper-500 uppercase">
+        City-pair guide
+      </p>
+      <h1 class="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+        Planning a meeting between London and Sydney
+      </h1>
+      <p class="mt-4 text-lg leading-relaxed text-paper-700">
+        London and Sydney are a useful test of whether a meeting plan is fair: the cities are far
+        apart, their daylight-saving seasons differ, and there is no hour that is comfortable for
+        both people every day of the year.
+      </p>
+    </header>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">
+        Start with the overlap, not the conversion
+      </h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        A conversion tells you the clock reading at one moment. A useful meeting plan starts with
+        boundaries: when does the London participant start and finish work, when is Sydney awake,
+        and who carries the early-morning or evening cost? For many teams, a London morning means a
+        Sydney evening. That can work, but it should be an explicit choice rather than an accidental
+        default.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">Why the gap does not stay put</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        The two cities do not change clocks on the same dates, and their seasons are reversed. The
+        difference therefore passes through short transition windows as well as its usual seasonal
+        gaps. A weekly meeting that feels fine in one month can move by an hour for the other person
+        a few weeks later. Use the <a
+          href="/difference/london/sydney"
+          class="ring-focus rounded font-medium text-paper-900 underline underline-offset-2 hover:text-paper-700"
+          >London–Sydney time-difference page</a
+        >
+        to see the current gap and the dates it changes.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">Make the compromise visible</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        Put both local times in the meeting title or description for the first few occurrences, for
+        example: “09:00 London / evening Sydney”. If the call repeats, agree whether the London hour
+        remains fixed or whether the difficult slot rotates. A quarterly rotation can be kinder than
+        asking the same person to take every early or late call.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">
+        Check a scenario before sending the invite
+      </h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        Open the <a
+          href="/overlap"
+          class="ring-focus rounded font-medium text-paper-900 underline underline-offset-2 hover:text-paper-700"
+          >meeting planner</a
+        >, add London and Sydney, set realistic working hours and choose a date near the next clock
+        change. The planner makes the trade-off visible and produces a shareable link, so the people
+        affected can see the same proposal before it becomes a standing meeting.
+      </p>
+    </section>
+  </article>
+</Base>

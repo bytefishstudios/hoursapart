@@ -1,0 +1,82 @@
+---
+import Base from '../../layouts/Base.astro';
+
+const title = 'Remote-team scheduling checklist across time zones';
+const description =
+  'A practical checklist for setting up fair, resilient recurring meetings for remote teams in different time zones.';
+---
+
+<Base title={title} description={description} path="/guides/remote-team-scheduling-checklist">
+  <article class="max-w-2xl">
+    <nav aria-label="Breadcrumb" class="mb-5 text-xs text-paper-500">
+      <a href="/guides" class="ring-focus hover:text-paper-900">Guides</a>
+      <span aria-hidden="true" class="mx-1.5">/</span>
+      <span aria-current="page">Scheduling checklist</span>
+    </nav>
+    <header class="mb-8">
+      <p class="text-[11px] font-semibold tracking-[0.15em] text-paper-500 uppercase">
+        Remote teams
+      </p>
+      <h1 class="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+        A remote-team scheduling checklist
+      </h1>
+      <p class="mt-4 text-lg leading-relaxed text-paper-700">
+        A recurring meeting becomes much easier to maintain when the team agrees on a few details
+        before the first invitation goes out. Use this list for a kickoff, handover or standing
+        call.
+      </p>
+    </header>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">Before you choose a time</h2>
+      <ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-paper-700">
+        <li>Collect each participant&apos;s city, not just an offset or abbreviation.</li>
+        <li>Ask for normal working hours and any non-negotiable boundaries.</li>
+        <li>
+          Decide whether attendance is essential for everyone or whether asynchronous updates can
+          replace some calls.
+        </li>
+        <li>Choose the city whose local time will anchor the calendar series.</li>
+      </ul>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">Before you send the invitation</h2>
+      <ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-paper-700">
+        <li>Check the selected hour in a tool that uses the actual meeting date.</li>
+        <li>Look ahead at the next daylight-saving transition for every location.</li>
+        <li>Write the anchor city and the other local times in the event description.</li>
+        <li>State whether the time stays fixed in the anchor city or rotates between regions.</li>
+      </ul>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">For the recurring series</h2>
+      <ul class="mt-3 list-disc space-y-2 pl-5 text-sm leading-relaxed text-paper-700">
+        <li>Add a reminder before each transition window where the local time changes.</li>
+        <li>
+          Review the arrangement after a few meetings instead of treating the first compromise as
+          permanent.
+        </li>
+        <li>Rotate inconvenient slots when the team spans a large east–west distance.</li>
+        <li>
+          Record decisions asynchronously so people outside the overlap are not excluded from the
+          work.
+        </li>
+      </ul>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">Make it shareable</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        The simplest test is whether every participant can open the same plan and understand why the
+        time was chosen. Set up the cities and working hours in the <a
+          href="/overlap"
+          class="ring-focus rounded font-medium text-paper-900 underline underline-offset-2 hover:text-paper-700"
+          >meeting planner</a
+        >, then share its link alongside the calendar invitation. It gives the team a common
+        reference when daylight saving changes the arithmetic later.
+      </p>
+    </section>
+  </article>
+</Base>

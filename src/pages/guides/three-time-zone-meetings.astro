@@ -1,0 +1,70 @@
+---
+import Base from '../../layouts/Base.astro';
+
+const title = 'How to schedule a meeting across three time zones';
+const description =
+  'A repeatable, fair process for selecting and documenting a meeting time across three time zones.';
+---
+
+<Base title={title} description={description} path="/guides/three-time-zone-meetings">
+  <article class="max-w-2xl">
+    <nav aria-label="Breadcrumb" class="mb-5 text-xs text-paper-500">
+      <a href="/guides" class="ring-focus hover:text-paper-900">Guides</a>
+      <span aria-hidden="true" class="mx-1.5">/</span>
+      <span aria-current="page">Three time zones</span>
+    </nav>
+    <header class="mb-8">
+      <p class="text-[11px] font-semibold tracking-[0.15em] text-paper-500 uppercase">
+        Team planning
+      </p>
+      <h1 class="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+        How to schedule a meeting across three time zones
+      </h1>
+      <p class="mt-4 text-lg leading-relaxed text-paper-700">
+        With three locations, there may be no perfect overlap. The goal is not to discover a magic
+        hour; it is to make the trade-off clear, repeatable and fair.
+      </p>
+    </header>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">1. Use cities, not abbreviations</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        Ask each person for their city or IANA time zone, not only “PST”, “IST” or “CST”. Those
+        abbreviations can be ambiguous and often hide daylight-saving changes. A city gives the
+        calendar enough information to resolve the right local time for each future date.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">2. Write down real availability</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        A nominal 09:00–17:00 day is only a starting point. One person may start early for school
+        pickup, another may accept one evening a week, and a third may have a protected lunch. Put
+        those limits into the <a
+          href="/overlap"
+          class="ring-focus rounded font-medium text-paper-900 underline underline-offset-2 hover:text-paper-700"
+          >meeting planner</a
+        > before looking for the overlap.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">3. Decide what “fair” means</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        Fair can mean the least total inconvenience, a time inside working hours for the person who
+        must make decisions, or a rotating burden across a recurring series. State the rule in the
+        invite. Without a rule, teams often optimise for the person who sends the first calendar
+        request rather than the people who attend it.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">4. Check the next transition, then share</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        Test the selected hour today and again around the next daylight-saving change. Then share a
+        link or invite description that lists all three local times and names the anchor city. This
+        is more reliable than asking every attendee to do mental offset arithmetic from an acronym.
+      </p>
+    </section>
+  </article>
+</Base>

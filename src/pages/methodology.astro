@@ -1,0 +1,64 @@
+---
+import Base from '../layouts/Base.astro';
+
+const title = 'How Hours Apart calculates time, DST and daylight';
+const description =
+  'A plain-language explanation of the time-zone, daylight-saving and daylight calculations used by Hours Apart, including their limits.';
+---
+
+<Base title={title} description={description} path="/methodology">
+  <article class="max-w-2xl">
+    <header class="mb-8">
+      <p class="text-[11px] font-semibold tracking-[0.15em] text-paper-500 uppercase">
+        Methodology
+      </p>
+      <h1 class="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+        How Hours Apart works
+      </h1>
+      <p class="mt-4 text-lg leading-relaxed text-paper-700">
+        Time-zone answers should be explainable. This page describes what the site calculates, where
+        the underlying rules come from and where you should verify a result elsewhere.
+      </p>
+    </header>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">Local time and daylight saving</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        Hours Apart uses the browser&apos;s built-in <span class="nums">Intl</span> time-zone support
+        and IANA time-zone names such as <span class="nums">Europe/London</span> and
+        <span class="nums"> America/New_York</span>. That lets a selected date be resolved using the
+        rules for that date, rather than assuming today&apos;s offset applies all year. The pages
+        compare offsets across future dates to identify when a gap changes.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">City coordinates and daylight</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        Each city has an approximate latitude. The site uses that latitude and the selected date to
+        estimate sunrise, sunset and the length of daylight. Latitude matters: places in the same
+        time zone can see very different sunrise and sunset times. These values are planning aids,
+        not a substitute for local astronomical or official weather information.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">What can change</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        Governments can change daylight-saving rules, sometimes with little notice. Browser and
+        operating-system updates carry IANA rule updates, and the site is rebuilt as its content is
+        maintained. For a flight, visa deadline, legal filing or other high-stakes commitment, check
+        the relevant authority or provider as well as the planned calendar event.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">What the planner does not know</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        The meeting planner does not read calendars or free/busy data. Its working-hour bands are
+        the hours you choose for each person. It is designed to make a proposed meeting
+        understandable before you send an invite, not to decide availability for you.
+      </p>
+    </section>
+  </article>
+</Base>

@@ -1,0 +1,88 @@
+---
+import Base from '../../layouts/Base.astro';
+
+const title = 'How daylight saving changes international meetings';
+const description =
+  'A practical guide to why recurring international meetings move, how to find the risky dates, and how to keep attendees informed.';
+---
+
+<Base title={title} description={description} path="/guides/daylight-saving-international-meetings">
+  <article class="max-w-2xl">
+    <nav aria-label="Breadcrumb" class="mb-5 text-xs text-paper-500">
+      <a href="/guides" class="ring-focus hover:text-paper-900">Guides</a>
+      <span aria-hidden="true" class="mx-1.5">/</span>
+      <span aria-current="page">Daylight saving and meetings</span>
+    </nav>
+    <header class="mb-8">
+      <p class="text-[11px] font-semibold tracking-[0.15em] text-paper-500 uppercase">
+        Recurring meetings
+      </p>
+      <h1 class="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+        How daylight saving changes international meetings
+      </h1>
+      <p class="mt-4 text-lg leading-relaxed text-paper-700">
+        A weekly call can be perfectly timed for months and then suddenly arrive an hour early for
+        someone. The invitation did not break; the relationship between the two local clocks did.
+      </p>
+    </header>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">The offset is a moving relationship</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        Daylight saving is set locally, not globally. Two places can both observe it yet move their
+        clocks on different weekends. One place can observe it while the other never does. Cities in
+        opposite hemispheres often move in opposite seasons. In each case, the difference between
+        their clocks can change even though neither team changed the calendar invite.
+      </p>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        The practical consequence is simple: a meeting anchored at 09:00 in one city is not always
+        anchored at the same local hour elsewhere. Treat the local time in the meeting
+        organiser&apos;s zone as the source of truth, then check every attendee&apos;s local time
+        around transitions.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">A five-minute pre-flight check</h2>
+      <ol class="mt-3 list-decimal space-y-2 pl-5 text-sm leading-relaxed text-paper-700">
+        <li>Choose the city whose local time defines the recurring meeting.</li>
+        <li>
+          Add every attendee&apos;s city to the <a
+            href="/overlap"
+            class="ring-focus rounded font-medium text-paper-900 underline underline-offset-2 hover:text-paper-700"
+            >meeting planner</a
+          >.
+        </li>
+        <li>Check the proposed hour now, then inspect the next six to twelve months.</li>
+        <li>Note every date on which a participant&apos;s local meeting time changes.</li>
+        <li>Put those dates in the calendar description or send a short reminder beforehand.</li>
+      </ol>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">
+        Choose a policy, not a one-off compromise
+      </h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        For a two-person call, the least painful answer is often obvious. For a recurring team
+        meeting, agree on a policy instead: keep the host city&apos;s hour fixed, rotate the burden
+        every quarter, or pause when the overlap becomes unreasonable. A stated policy avoids
+        treating an unpleasant time as an accident that only one person has to absorb.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">Use the date, not a remembered rule</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        “They change at the end of March” is not enough for planning. Rules can differ by country
+        and governments can alter them. Use a converter that accepts the actual meeting date, and
+        re-check important series after any calendar-system warning. Hours Apart&apos;s <a
+          href="/difference"
+          class="ring-focus rounded font-medium text-paper-900 underline underline-offset-2 hover:text-paper-700"
+          >time-difference pages</a
+        >
+        show the dates on which each listed pair changes.
+      </p>
+    </section>
+  </article>
+</Base>

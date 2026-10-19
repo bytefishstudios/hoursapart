@@ -1,0 +1,73 @@
+---
+import Base from '../layouts/Base.astro';
+
+const title = 'About Hours Apart — a practical world clock';
+const description =
+  'Why Hours Apart exists, what it helps with, and how it is maintained as a practical tool for people coordinating across time zones.';
+---
+
+<Base title={title} description={description} path="/about">
+  <article class="max-w-2xl">
+    <header class="mb-8">
+      <p class="text-[11px] font-semibold tracking-[0.15em] text-paper-500 uppercase">About</p>
+      <h1 class="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+        A world clock for the human part of time zones
+      </h1>
+      <p class="mt-4 text-lg leading-relaxed text-paper-700">
+        Hours Apart is an independent tool for people who work, travel, study or keep in touch
+        across cities. It answers the question behind a conversion: not only what time it is there,
+        but whether it is a sensible hour to call.
+      </p>
+    </header>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">What the tool is for</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        A normal time converter gives an offset for one moment. That is useful, but it misses the
+        practical questions: Is it daylight? Is this inside a colleague&apos;s working day? Will a
+        weekly meeting shift when one city changes its clocks? Hours Apart brings those questions
+        into one view with a world clock, a meeting planner and city-pair explanations.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">Built around real scheduling decisions</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        The site focuses on cities people commonly compare rather than trying to list every possible
+        time-zone label. City pages show the current local time, daylight-saving transitions and an
+        approximate daylight pattern. Pair pages show every gap that occurs across the year and the
+        dates it changes. The meeting planner lets you model working hours before sending an invite.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">How it is maintained</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        Hours Apart is actively maintained as a small web product. The city list, explanations,
+        daylight-saving wording and navigation are reviewed as the tool develops. Changes that
+        affect the service are recorded in the <a
+          href="/changelog"
+          class="ring-focus rounded font-medium text-paper-900 underline underline-offset-2 hover:text-paper-700"
+          >changelog</a
+        >. The underlying methods and their limits are explained in <a
+          href="/methodology"
+          class="ring-focus rounded font-medium text-paper-900 underline underline-offset-2 hover:text-paper-700"
+          >how Hours Apart works</a
+        >.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">Feedback makes the tool better</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        If a city is missing, a transition looks wrong or a planning flow is awkward, send a
+        specific example through the <a
+          href="/contact"
+          class="ring-focus rounded font-medium text-paper-900 underline underline-offset-2 hover:text-paper-700"
+          >contact page</a
+        >. A share link, the cities involved and the date being checked are usually enough to
+        reproduce a problem.
+      </p>
+    </section>
+  </article>
+</Base>

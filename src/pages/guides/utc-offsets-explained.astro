@@ -1,0 +1,76 @@
+---
+import Base from '../../layouts/Base.astro';
+
+const title = 'UTC offsets explained: UTC+, UTC− and time zones';
+const description =
+  'What UTC offsets mean, why they change, and why an offset is not the same thing as a time zone.';
+---
+
+<Base title={title} description={description} path="/guides/utc-offsets-explained">
+  <article class="max-w-2xl">
+    <nav aria-label="Breadcrumb" class="mb-5 text-xs text-paper-500">
+      <a href="/guides" class="ring-focus hover:text-paper-900">Guides</a>
+      <span aria-hidden="true" class="mx-1.5">/</span>
+      <span aria-current="page">UTC offsets</span>
+    </nav>
+    <header class="mb-8">
+      <p class="text-[11px] font-semibold tracking-[0.15em] text-paper-500 uppercase">
+        Time-zone basics
+      </p>
+      <h1 class="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+        UTC offsets explained
+      </h1>
+      <p class="mt-4 text-lg leading-relaxed text-paper-700">
+        UTC+09:00 tells you a clock is nine hours ahead of Coordinated Universal Time at that
+        moment. It does not, on its own, tell you which city the clock belongs to or whether it will
+        be nine hours ahead next month.
+      </p>
+    </header>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">What “UTC+” and “UTC−” mean</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        UTC is the common reference used to compare civil time around the world. A location at
+        <span class="nums"> UTC+02:00</span> is two hours ahead of UTC; a location at
+        <span class="nums"> UTC−05:00</span> is five hours behind it. Offsets can include minutes, so
+        not every place is separated by whole hours.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">
+        An offset is a snapshot; a time zone is a rule set
+      </h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        A time zone is a set of rules that determines which offset applies on a particular date.
+        <span class="nums"> America/New_York</span>, for example, uses different offsets during
+        standard time and daylight saving. Two cities can share today&apos;s offset and still change
+        at different dates, or one can change while the other remains fixed. That is why a recurring
+        meeting needs cities or IANA zone names rather than a saved offset.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">Why abbreviations cause confusion</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        Labels such as CST, IST and GMT are convenient in conversation but can be ambiguous or used
+        differently in different places. They also encourage people to treat daylight-saving time as
+        a separate label instead of a change in the same city&apos;s rules. In an invitation,
+        writing a city and date is clearer than relying on an abbreviation alone.
+      </p>
+    </section>
+
+    <section class="mt-8">
+      <h2 class="text-xl font-semibold tracking-tight">A practical way to convert safely</h2>
+      <p class="mt-3 text-sm leading-relaxed text-paper-700">
+        Start with the intended date and local time in the city that owns the event. Then convert it
+        to each attendee&apos;s city. For a repeating event, check transition dates rather than
+        assuming the initial conversion lasts forever. The <a
+          href="/"
+          class="ring-focus rounded font-medium text-paper-900 underline underline-offset-2 hover:text-paper-700"
+          >world clock</a
+        > and city pages make those date-specific checks easier.
+      </p>
+    </section>
+  </article>
+</Base>

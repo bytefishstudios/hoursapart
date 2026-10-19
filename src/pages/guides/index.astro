@@ -1,0 +1,69 @@
+---
+import Base from '../../layouts/Base.astro';
+
+const title = 'Time-zone guides for global teams | Hours Apart';
+const description =
+  'Practical guides for daylight saving, three-time-zone meetings, London–Sydney scheduling, UTC offsets and remote-team planning.';
+
+const guides = [
+  {
+    href: '/guides/daylight-saving-international-meetings',
+    title: 'How daylight saving changes international meetings',
+    description: 'Why recurring calls move, which dates matter and how to prevent surprises.',
+  },
+  {
+    href: '/guides/london-sydney-meeting-times',
+    title: 'Planning a meeting between London and Sydney',
+    description: 'A practical way to share the inconvenience across a large, changing time gap.',
+  },
+  {
+    href: '/guides/three-time-zone-meetings',
+    title: 'How to schedule across three time zones',
+    description: 'A repeatable process for finding, documenting and rotating a fair overlap.',
+  },
+  {
+    href: '/guides/utc-offsets-explained',
+    title: 'UTC offsets explained',
+    description: 'What UTC+ and UTC− mean, and why an offset is not the same as a time zone.',
+  },
+  {
+    href: '/guides/remote-team-scheduling-checklist',
+    title: 'A remote-team scheduling checklist',
+    description: 'The questions to settle before a meeting series becomes a recurring problem.',
+  },
+];
+---
+
+<Base title={title} description={description} path="/guides">
+  <header class="mb-9 max-w-2xl">
+    <p class="text-[11px] font-semibold tracking-[0.15em] text-paper-500 uppercase">Guides</p>
+    <h1 class="mt-2 text-3xl font-semibold tracking-tight text-balance sm:text-4xl">
+      Make time zones easier to work with
+    </h1>
+    <p class="mt-4 text-lg leading-relaxed text-paper-700">
+      Practical explanations for the decisions behind a conversion: recurring meetings, daylight
+      saving, uneven trade-offs and how to communicate a time clearly.
+    </p>
+  </header>
+
+  <div class="grid gap-4 sm:grid-cols-2">
+    {
+      guides.map((guide) => (
+        <article class="rounded-2xl border border-paper-200 bg-white p-6 elev">
+          <h2 class="text-lg font-semibold tracking-tight">
+            <a href={guide.href} class="ring-focus rounded hover:text-paper-700">
+              {guide.title}
+            </a>
+          </h2>
+          <p class="mt-2 text-sm leading-relaxed text-paper-700">{guide.description}</p>
+          <a
+            href={guide.href}
+            class="ring-focus mt-4 inline-block rounded text-sm font-medium text-paper-900 hover:underline"
+          >
+            Read guide &rarr;
+          </a>
+        </article>
+      ))
+    }
+  </div>
+</Base>
