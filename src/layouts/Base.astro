@@ -15,12 +15,12 @@ const { title, description, path, image } = Astro.props;
 const origin = new URL(Astro.site ?? Astro.url.origin);
 const canonical = new URL(path ?? Astro.url.pathname, origin);
 const ogImage = new URL(image ?? '/og.png', origin);
-// Ads run only on the content pages that earn search traffic — the city and
-// difference pages. The tools (`/`, `/overlap`) and the legal/contact pages
-// stay free of ad tags: the tools to protect their Core Web Vitals and feel,
-// the legal pages because the consent message links to them.
+// Keep the advertising integration on the pages with the clearest editorial
+// and product value. The large city and city-pair catalogue remains free of
+// ad tags, as do the legal, contact and site-maintenance pages.
 const adPath = path ?? Astro.url.pathname;
-const showAdvertisingScript = adPath.startsWith('/time/') || adPath.startsWith('/difference/');
+const showAdvertisingScript =
+  adPath === '/' || adPath === '/overlap' || adPath === '/guides' || adPath.startsWith('/guides/');
 
 /** Current path, normalised without a trailing slash, for marking the active nav item. */
 const here = (path ?? Astro.url.pathname).replace(/\/+$/, '') || '/';

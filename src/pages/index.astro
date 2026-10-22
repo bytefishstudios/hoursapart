@@ -232,5 +232,64 @@ const faqs = [
     </div>
   </section>
 
+  <section
+    class="mt-24 border-t border-paper-200 pt-10 sm:mt-32 sm:pt-14"
+    aria-labelledby="guides-heading"
+  >
+    <div class="max-w-2xl">
+      <p class="text-xs font-semibold tracking-widest text-paper-500 uppercase">Practical guides</p>
+      <h2
+        id="guides-heading"
+        class="mt-3 text-2xl font-semibold tracking-tight text-balance sm:text-3xl"
+      >
+        Make the next international meeting easier
+      </h2>
+      <p class="mt-3 leading-relaxed text-paper-700">
+        Short, practical explanations for the details a clock alone cannot settle: daylight-saving
+        weeks, working across three time zones and choosing a meeting time that keeps changing.
+      </p>
+    </div>
+
+    <div class="mt-7 grid gap-4 md:grid-cols-3">
+      {
+        [
+          {
+            href: '/guides/daylight-saving-international-meetings',
+            title: 'Daylight saving and international meetings',
+            description: 'Why recurring calls move, and the weeks that cause the surprise.',
+          },
+          {
+            href: '/guides/three-time-zone-meetings',
+            title: 'Planning across three time zones',
+            description: 'A fair way to rotate the awkward hour instead of fixing it on one team.',
+          },
+          {
+            href: '/guides/remote-team-scheduling-checklist',
+            title: 'Remote-team scheduling checklist',
+            description: 'A concise check before you send an international calendar invitation.',
+          },
+        ].map((guide) => (
+          <a
+            href={guide.href}
+            class="ring-focus elev-hover rounded-2xl border border-paper-200 bg-white p-5 transition hover:border-paper-300"
+          >
+            <h3 class="text-base font-semibold tracking-tight">{guide.title}</h3>
+            <p class="mt-2 text-sm leading-relaxed text-paper-700">{guide.description}</p>
+            <span class="mt-4 inline-block text-sm font-semibold text-paper-900">
+              Read guide <span aria-hidden="true">&rarr;</span>
+            </span>
+          </a>
+        ))
+      }
+    </div>
+
+    <a
+      href="/guides"
+      class="ring-focus mt-6 inline-flex text-sm font-semibold text-paper-900 underline decoration-paper-300 underline-offset-4 hover:decoration-paper-900"
+    >
+      Browse all time-zone guides <span class="ml-1" aria-hidden="true">&rarr;</span>
+    </a>
+  </section>
+
   <Faq faqs={faqs} />
 </Base>
